@@ -52,9 +52,6 @@
         </div>
       </form>
       
-      <div class="login-footer">
-        <p class="grey-text">默认账号: admin / admin</p>
-      </div>
     </div>
   </div>
 </template>
@@ -81,7 +78,7 @@ export default {
       
       try {
         // 简单的验证逻辑 - 你可以根据需要修改
-        if (this.username === 'admin' && this.password === 'admin') {
+        if (this.username === 'admin' && this.password === 'promefire123') {
           // 登录成功
           localStorage.setItem('isLoggedIn', 'true');
           localStorage.setItem('username', this.username);

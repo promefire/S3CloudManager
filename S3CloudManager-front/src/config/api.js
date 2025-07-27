@@ -2,7 +2,7 @@
 const config = {
   // 开发环境配置
   development: {
-    baseURL: process.env.VUE_APP_API_BASE_URL || 'http://localhost:8080/api/v1'
+    baseURL: process.env.VUE_APP_API_BASE_URL || 'http://localhost:9000/api/v1'
   },
   // 生产环境配置
   production: {
