@@ -197,11 +197,15 @@
         <!-- 缩略图视图 -->
         <div v-if="objects.length && viewMode === 'thumbnail'" class="thumbnail-grid">
           <div v-for="(object, index) in objects" :key="index" class="thumbnail-item">
-            <div class="thumbnail-card" :class="{ 'folder-card': object.IsFolder }" @click="handleObjectClick(object)">
+            <div class="thumbnail-card" :class="{ 'folder-card': object.IsFolder, 'selected': !object.IsFolder && multiSelectMode && selectedObjects.includes(object.Key) }" @click="object.IsFolder ? handleObjectClick(object) : (multiSelectMode ? toggleObjectSelection(object.Key) : handleObjectClick(object))">
+              <!-- 多选复选框 -->
+              <div v-if="!object.IsFolder && multiSelectMode" class="thumbnail-checkbox" @click.stop="toggleObjectSelection(object.Key)">
+                <span class="thumbnail-checkmark" :class="{ 'checked': selectedObjects.includes(object.Key) }"></span>
+              </div>
               <!-- 图片缩略图 -->
               <div v-if="isImageFile(object.Key)" class="thumbnail-image-container">
                 <img :src="getImageRealUrl(object.Key)" :alt="object.DisplayName" class="thumbnail-image" loading="lazy" @error="handleImageError($event)" />
-                <div class="thumbnail-overlay">
+                <div class="thumbnail-overlay" v-if="!multiSelectMode">
                   <i class="material-icons">zoom_in</i>
                 </div>
               </div>
@@ -217,7 +221,7 @@
               <div class="thumbnail-name" :title="object.DisplayName">{{ object.DisplayName }}</div>
             </div>
             <!-- 操作按钮 -->
-            <div class="thumbnail-actions">
+            <div class="thumbnail-actions" v-if="!multiSelectMode">
               <button v-if="!object.IsFolder && isImageFile(object.Key)" @click.stop="copyImageUrl(object.Key)" class="btn-floating btn-small btn-primary waves-effect waves-light" title="复制图片链接">
                 <i class="material-icons">content_copy</i>
               </button>
@@ -331,7 +335,7 @@ export default {
         showUploadPanel: false,
         isDragOver: false,
         multiSelectMode: false,
-        viewMode: 'list',
+        viewMode: 'thumbnail',
         previewImage: null,
         convertToWebp: false,
         webpQuality: 0.85,
@@ -1531,6 +1535,55 @@ export default {
   .thumbnail-actions .btn-small i {
     font-size: 16px;
     line-height: 30px;
+  }
+
+  /* 缩略图多选复选框 */
+  .thumbnail-checkbox {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 5;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .thumbnail-checkmark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: all 0.15s ease;
+  }
+
+  .thumbnail-checkmark.checked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: none;
+  }
+
+  .thumbnail-checkmark.checked::after {
+    content: '';
+    display: block;
+    width: 6px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+
+  .thumbnail-checkbox:hover .thumbnail-checkmark {
+    border-color: white;
+  }
+
+  /* 选中卡片高亮 */
+  .thumbnail-card.selected {
+    box-shadow: 0 0 0 2px var(--color-primary), 0 4px 16px rgba(37, 99, 235, 0.25);
+    border-color: var(--color-primary);
   }
 
   /* ========== 图片预览 Lightbox ========== */
