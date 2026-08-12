@@ -1,24 +1,42 @@
 <template>
   <div id="app">
-    <nav v-if="isLoggedIn">
-      <div class="nav-wrapper container">
-        <a href="/" class="brand-logo">S3 云存储管理平台</a>
-        <ul class="right">
-          <li>
-            <span class="user-info">
-              <i class="material-icons left">account_circle</i>
-              {{ username }}
-            </span>
-          </li>
-          <li>
-            <a href="#" @click="handleLogout" class="waves-effect waves-light btn" style="background-color: #1976D2; color: white; font-weight: 500; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">
-              <i class="material-icons left" style="color: white;">logout</i>登出
+    <!-- 顶部 Header -->
+    <header v-if="isLoggedIn" class="app-header">
+      <div class="header-container">
+        <div class="header-left">
+          <a href="/" class="header-logo">
+            <i class="material-icons">cloud</i>
+            <span>S3 Storage</span>
+          </a>
+        </div>
+        <div class="header-right">
+          <div class="user-menu" @click="toggleUserMenu" ref="userMenu">
+            <div class="user-avatar">{{ username.charAt(0).toUpperCase() }}</div>
+            <span class="user-name">{{ username }}</span>
+            <i class="material-icons user-arrow">expand_more</i>
+          </div>
+          <div v-if="showUserMenu" class="user-dropdown" @click.stop>
+            <div class="dropdown-header">
+              <span class="dropdown-username">{{ username }}</span>
+              <span class="dropdown-role">管理员</span>
+            </div>
+            <div class="dropdown-divider"></div>
+            <a href="#" class="dropdown-item" @click="handleLogout">
+              <i class="material-icons">logout</i>
+              <span>退出登录</span>
             </a>
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
-    </nav>
-    <router-view/>
+    </header>
+
+    <!-- 主内容区域 -->
+    <main v-if="isLoggedIn" class="app-main">
+      <router-view/>
+    </main>
+
+    <!-- 未登录时直接显示路由内容 -->
+    <router-view v-if="!isLoggedIn"/>
   </div>
 </template>
 
@@ -29,7 +47,8 @@ export default {
   data() {
     return {
       isLoggedIn: false,
-      username: ''
+      username: '',
+      showUserMenu: false
     }
   },
   methods: {
@@ -42,342 +61,454 @@ export default {
       localStorage.removeItem('username')
       this.isLoggedIn = false
       this.username = ''
+      this.showUserMenu = false
       M.toast({ html: '已登出', classes: 'green' })
       this.$router.push('/login')
+    },
+    toggleUserMenu() {
+      this.showUserMenu = !this.showUserMenu
+    },
+    handleClickOutside(event) {
+      if (this.$refs.userMenu && !this.$refs.userMenu.contains(event.target)) {
+        this.showUserMenu = false
+      }
     }
   },
   mounted() {
     this.checkAuthStatus()
-    // 监听存储变化
     window.addEventListener('storage', this.checkAuthStatus)
+    document.addEventListener('click', this.handleClickOutside)
   },
   beforeUnmount() {
     window.removeEventListener('storage', this.checkAuthStatus)
+    document.removeEventListener('click', this.handleClickOutside)
   }
 }
 </script>
 
 <style>
-.breadcrumb:before {
-    content: '/';
-}
-#notifications {
-    top: 20px;
-    right: 30px;
-    position: fixed;
-    z-index: 2
+/* ========== CSS Variables / Design Tokens ========== */
+:root {
+  /* 颜色系统 */
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-light: #EFF6FF;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-text: #0F172A;
+  --color-text-secondary: #64748B;
+  --color-border: #E2E8F0;
+  --color-danger: #EF4444;
+  --color-danger-hover: #DC2626;
+  --color-success: #16A34A;
+  --color-success-hover: #15803D;
+  --color-warning: #F59E0B;
+
+  /* 间距系统 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* 字体 */
+  --font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
-.user-info {
-    color: white !important;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    font-weight: 500;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-    background-color: rgba(255, 255, 255, 0.1);
-    padding: 8px 12px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+/* ========== 全局基础样式 ========== */
+* {
+  box-sizing: border-box;
 }
 
-.user-info i {
-    margin-right: 8px;
-    color: white !important;
-    font-size: 20px;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-nav ul a {
-    color: white !important;
-    font-weight: 500;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+/* ========== Header 样式 ========== */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
 }
 
-nav ul a:hover {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-    color: white !important;
+.header-container {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-2xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-nav ul a i {
-    color: white !important;
-    margin-right: 5px;
+.header-left {
+  display: flex;
+  align-items: center;
 }
 
-/* 导航栏按钮样式 */
-nav .btn {
-    background-color: #1976D2 !important;
-    color: white !important;
-    font-weight: 500 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
-    border: none !important;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-decoration: none;
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
 }
 
-nav .btn:hover {
-    background-color: #1565C0 !important;
-    color: white !important;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3) !important;
+.header-logo i {
+  font-size: 24px;
+  color: var(--color-primary);
 }
 
-nav .btn.red {
-    background-color: #f44336 !important;
+.header-right {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
-nav .btn.red:hover {
-    background-color: #d32f2f !important;
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
-nav .btn i {
-    color: white !important;
-    font-size: 18px !important;
-    margin-right: 6px !important;
+.user-menu:hover {
+  background-color: var(--color-bg);
 }
 
-/* 确保所有按钮图标清晰可见 */
-.btn i.material-icons {
-    color: white !important;
-    font-size: 18px !important;
-    margin-right: 6px !important;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) !important;
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
 }
 
-.btn-large i.material-icons {
-    font-size: 20px !important;
-    margin-right: 8px !important;
+.user-name {
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--color-text);
 }
 
-.btn-floating i.material-icons {
-    color: white !important;
-    font-size: 18px !important;
+.user-arrow {
+  font-size: 18px;
+  color: var(--color-text-secondary);
 }
 
-/* 导航栏右侧按钮间距 */
-nav ul.right li {
-    margin-left: 10px;
+/* 用户下拉菜单 */
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + var(--spacing-sm));
+  right: 0;
+  min-width: 200px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-sm) 0;
+  z-index: 1001;
 }
 
-nav ul.right li:last-child {
-    margin-right: 20px;
+.dropdown-header {
+  padding: var(--spacing-md) var(--spacing-lg);
 }
 
-/* 确保品牌logo清晰 */
-.brand-logo {
-    color: white !important;
-    font-weight: 600 !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+.dropdown-username {
+  display: block;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
-.brand-logo i {
-    color: white !important;
-    margin-right: 8px;
+.dropdown-role {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
 }
 
-/* 蓝色主题样式 */
-nav {
-    background-color: #1976D2 !important;
+.dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--spacing-xs) 0;
 }
 
-.brand-logo {
-    color: white !important;
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.dropdown-item:hover {
+  background-color: var(--color-bg);
+  text-decoration: none;
+}
+
+.dropdown-item i {
+  font-size: 20px;
+  color: var(--color-text-secondary);
+}
+
+/* ========== 主内容区域 ========== */
+.app-main {
+  padding-top: 64px; /* Header height */
+  min-height: 100vh;
+}
+
+/* ========== 全局按钮样式优化 ========== */
+.btn,
+.btn-large,
+.btn-small,
+.btn-floating {
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-family);
+  text-transform: none;
+  box-shadow: none !important;
 }
 
 .btn {
-    background-color: #1976D2 !important;
-    color: white !important;
-    font-weight: 500;
-}
-
-.btn:hover {
-    background-color: #1565C0 !important;
-    color: white !important;
-}
-
-.btn:disabled {
-    background-color: #ccc !important;
-    color: #666 !important;
+  height: 36px;
+  line-height: 36px;
+  padding: 0 var(--spacing-lg);
+  font-size: var(--font-size-md);
 }
 
 .btn-large {
-    background-color: #1976D2 !important;
-    color: white !important;
-    font-weight: 500;
+  height: 44px;
+  line-height: 44px;
+  padding: 0 var(--spacing-xl);
+  font-size: var(--font-size-lg);
 }
 
-.btn-large:hover {
-    background-color: #1565C0 !important;
-    color: white !important;
+.btn-small {
+  height: 30px;
+  line-height: 30px;
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
 }
 
 .btn-floating {
-    background-color: #1976D2 !important;
-    color: white !important;
+  width: 40px;
+  height: 40px;
 }
 
-.btn-floating:hover {
-    background-color: #1565C0 !important;
-    color: white !important;
+.btn-floating.btn-large {
+  width: 56px;
+  height: 56px;
 }
 
-.btn-floating i {
-    color: white !important;
+.btn-floating.btn-small {
+  width: 30px;
+  height: 30px;
 }
 
-.pagination li.active {
-    background-color: #1976D2 !important;
+/* Primary button */
+.btn[style*="background-color: #1976D2"],
+.btn[style*="background-color: rgb(25, 118, 210)"] {
+  background-color: var(--color-primary) !important;
 }
 
-.pagination li a:hover {
-    background-color: #E3F2FD !important;
-    color: #1976D2 !important;
+/* ========== 全局卡片样式优化 ========== */
+.card {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm) !important;
 }
 
-.collection-item:hover {
-    background-color: #E3F2FD !important;
+.card:hover {
+  box-shadow: var(--shadow-md) !important;
 }
 
-.card-panel {
-    border-left: 4px solid #1976D2 !important;
-}
-
-/* 文件上传区域蓝色主题 */
-.file-field .btn {
-    background-color: #1976D2 !important;
-}
-
-.file-field .btn:hover {
-    background-color: #1565C0 !important;
-}
-
-/* 表格头部蓝色 */
-table thead th {
-    background-color: #E3F2FD !important;
-    color: #1976D2 !important;
-    font-weight: 600;
-}
-
-/* 表格内容确保可读性 */
-table tbody tr {
-    border-bottom: 1px solid #e0e0e0;
-}
-
-table tbody tr:hover {
-    background-color: #f5f5f5;
-}
-
-/* 确保文字颜色对比度 */
-table tbody td {
-    color: #333 !important;
-}
-
-/* 确保所有文字都有足够对比度 */
-p, span, div, label {
-    color: #333 !important;
-}
-
-.grey-text {
-    color: #666 !important;
-}
-
-/* 确保链接文字清晰 */
-a {
-    color: #1976D2 !important;
-    text-decoration: none;
-}
-
-a:hover {
-    color: #1565C0 !important;
-    text-decoration: underline;
-}
-
-/* 确保图标文字清晰 */
-.material-icons {
-    color: #1976D2 !important;
-}
-
-/* 确保卡片内容清晰 */
 .card-content {
-    color: #333 !important;
+  padding: var(--spacing-lg);
 }
 
 .card-title {
-    color: #1976D2 !important;
-    font-weight: 600;
+  font-size: var(--font-size-lg) !important;
+  font-weight: 600 !important;
 }
 
-/* 分页文字颜色 */
+/* ========== 全局表格样式优化 ========== */
+table.striped {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+table.striped thead th {
+  background-color: var(--color-bg) !important;
+  color: var(--color-text-secondary) !important;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+table.striped tbody td {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+table.striped tbody tr:last-child td {
+  border-bottom: none;
+}
+
+table.striped tbody tr:hover {
+  background-color: var(--color-primary-light) !important;
+}
+
+/* ========== 全局分页样式优化 ========== */
+.pagination li {
+  border-radius: var(--radius-sm) !important;
+}
+
 .pagination li a {
-    color: #1976D2 !important;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.pagination li.active {
+  background-color: var(--color-primary) !important;
 }
 
 .pagination li.active a {
-    color: white !important;
+  color: white !important;
 }
 
-.pagination li.disabled a {
-    color: #ccc !important;
+/* ========== 全局表单样式优化 ========== */
+.input-field input:focus,
+.input-field textarea:focus {
+  border-bottom: 1px solid var(--color-primary) !important;
+  box-shadow: 0 1px 0 0 var(--color-primary) !important;
 }
 
-/* 链接颜色 */
-a {
-    color: #1976D2 !important;
+.input-field input:focus + label,
+.input-field textarea:focus + label {
+  color: var(--color-primary) !important;
 }
 
-a:hover {
-    color: #1565C0 !important;
+.input-field .prefix.active {
+  color: var(--color-primary) !important;
 }
 
-/* 图标颜色 */
-.material-icons {
-    color: #1976D2 !important;
+/* ========== 全局 Modal 优化 ========== */
+.modal {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
-/* 文件夹图标保持蓝色 */
-.material-icons[style*="folder"] {
-    color: #1976D2 !important;
+.modal .modal-content {
+  padding: var(--spacing-2xl);
 }
 
-/* 图片文件保持绿色 */
-.material-icons[style*="image"] {
-    color: #4CAF50 !important;
+.modal .modal-footer {
+  padding: var(--spacing-md) var(--spacing-2xl);
+  border-top: 1px solid var(--color-border);
 }
 
-/* 面包屑导航样式 */
+.modal .modal-footer .btn,
+.modal .modal-footer .btn-flat {
+  margin-left: var(--spacing-sm);
+}
+
+/* ========== 全局 Collection 优化 ========== */
+.collection {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--color-border);
+}
+
+.collection .collection-item {
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+/* ========== 面包屑优化 ========== */
 .breadcrumb {
-    color: #1976D2 !important;
-    font-weight: 500;
+  font-size: var(--font-size-md);
+  color: var(--color-primary);
 }
 
 .breadcrumb:hover {
-    color: #1565C0 !important;
-    text-decoration: underline;
+  color: var(--color-primary-hover);
+  text-decoration: underline;
 }
 
 .breadcrumb:before {
-    color: #666 !important;
+  color: var(--color-text-secondary) !important;
+  content: '/';
 }
 
-/* 确保文字对比度 */
-.nav-wrapper {
-    background-color: #1976D2 !important;
+/* ========== 通用链接颜色 ========== */
+a {
+  color: var(--color-primary);
 }
 
-.nav-wrapper .breadcrumb {
-    color: white !important;
+a:hover {
+  color: var(--color-primary-hover);
 }
 
-.nav-wrapper .breadcrumb:hover {
-    color: #E3F2FD !important;
+/* ========== 滚动条优化 ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.nav-wrapper .breadcrumb:before {
-    color: rgba(255, 255, 255, 0.7) !important;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
 
-
-/* 卡片面板背景 */
-.card-panel {
-    border-left: 4px solid #1976D2 !important;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
 }
 </style>

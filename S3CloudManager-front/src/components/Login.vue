@@ -3,7 +3,7 @@
     <div class="login-card">
       <div class="login-header">
         <i class="material-icons large">cloud</i>
-        <h4>S3 对象存储管理</h4>
+        <h4>S3 Storage</h4>
         <p>请登录以访问控制台</p>
       </div>
       
@@ -40,9 +40,8 @@
           <div class="col s12">
             <button 
               type="submit" 
-              class="btn waves-effect waves-light col s12"
+              class="btn waves-effect waves-light col s12 btn-login"
               :disabled="isLoading"
-              style="background-color: #1976D2;"
             >
               <i class="material-icons left" v-if="!isLoading">login</i>
               <i class="material-icons left" v-else>hourglass_empty</i>
@@ -114,64 +113,80 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  background: var(--color-bg);
+  padding: var(--spacing-xl);
 }
 
 .login-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  padding: 40px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-3xl);
   width: 100%;
   max-width: 400px;
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: var(--spacing-2xl);
 }
 
 .login-header i {
-  color: #1976D2;
-  margin-bottom: 15px;
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-md);
 }
 
 .login-header h4 {
-  margin: 10px 0;
-  color: #333;
+  margin: var(--spacing-sm) 0;
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
 }
 
 .login-header p {
-  color: #666;
+  color: var(--color-text-secondary);
   margin: 0;
+  font-size: var(--font-size-md);
 }
 
 .login-form {
-  margin-bottom: 20px;
+  margin-bottom: var(--spacing-xl);
 }
 
 .login-footer {
   text-align: center;
-  border-top: 1px solid #eee;
-  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-xl);
 }
 
 .login-footer p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-md);
+}
+
+.btn-login {
+  background-color: var(--color-primary) !important;
+  height: 44px;
+  line-height: 44px;
+  font-size: var(--font-size-lg);
+  border-radius: var(--radius-md);
+}
+
+.btn-login:hover {
+  background-color: var(--color-primary-hover) !important;
 }
 
 .input-field input:focus + label {
-  color: #1976D2 !important;
+  color: var(--color-primary) !important;
 }
 
 .input-field input:focus {
-  border-bottom: 1px solid #1976D2 !important;
-  box-shadow: 0 1px 0 0 #1976D2 !important;
+  border-bottom: 1px solid var(--color-primary) !important;
+  box-shadow: 0 1px 0 0 var(--color-primary) !important;
 }
 
 .input-field .prefix.active {
-  color: #1976D2 !important;
+  color: var(--color-primary) !important;
 }
 </style> 

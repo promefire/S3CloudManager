@@ -1,23 +1,27 @@
 <template>
     <div>
-      <nav class="nav-extended" style="background-color: #E0FFFF;">
-        <div class="nav-wrapper container" style="background-color: #E3F2FD;">
-          <a href="#" class="brand-logo center" style="color: #E0FFFF;"><i class="material-icons" style="color: #1976D2;">folder_open</i>{{ bucketName }}</a>
-          <ul class="right">
-            <li v-if="!objects.length" style="margin-right: 20px;">
-              <a class="waves-effect waves-light btn red" @click="deleteBucket" style="color: white; font-weight: 500; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);">
-                删除 <i class="material-icons right" style="color: white;">delete</i>
-              </a>
-            </li>
-          </ul>
+      <!-- 页面工具栏 -->
+      <div class="page-toolbar">
+        <div class="toolbar-container">
+          <div class="toolbar-left">
+            <router-link to="/" class="page-title-link">
+              <i class="material-icons">arrow_back</i>
+              <span class="page-title">{{ bucketName }}</span>
+            </router-link>
+            <div class="toolbar-breadcrumbs">
+              <a href="#" class="breadcrumb-link" @click="navigateTo('')">{{ bucketName }}</a>
+              <a v-for="crumb in breadcrumbs.slice(1)" :key="crumb.path" href="#" class="breadcrumb-link" @click="navigateTo(crumb.path)">{{ crumb.name }}</a>
+            </div>
+          </div>
+          <div class="toolbar-right" v-if="!objects.length">
+            <button @click="deleteBucket" class="btn btn-danger waves-effect waves-light">
+              <i class="material-icons left">delete</i>删除
+            </button>
+          </div>
         </div>
-        <div class="nav-wrapper container" style="background-color: #E3F2FD;">
-          <router-link to="/" class="breadcrumb" style="color: #1976D2;"><i class="material-icons" style="color: #1976D2;">arrow_back</i> 存储桶</router-link>
-          <a href="#" class="breadcrumb" @click="navigateTo('')" style="color: #1976D2;">{{ bucketName }}</a>
-          <a v-for="crumb in breadcrumbs.slice(1)" :key="crumb.path" href="#" class="breadcrumb" @click="navigateTo(crumb.path)" style="color: #1976D2;">{{ crumb.name }}</a>
-        </div>
-      </nav>
-              <div class="section" style="margin: 10px; position: relative;">
+      </div>
+
+      <div class="page-content">
           
           
           <!-- 文件上传区域 -->
@@ -27,24 +31,24 @@
             <div v-if="!showUploadPanel" class="row" style="margin-bottom: 0;">
               <div class="col s6">
                 <div class="left">
-                  <button @click="showUploadPanel = true" class="btn waves-effect waves-light" style="background-color: #1976D2; margin-right: 10px;">
-                    <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">cloud_upload</i>上传文件
+                  <button @click="showUploadPanel = true" class="btn btn-primary waves-effect waves-light">
+                    <i class="material-icons left">cloud_upload</i>上传文件
                   </button>
-                  <a class="waves-effect waves-light btn modal-trigger" data-target="modal-create-folder" style="background-color: #1976D2; color: white; font-weight: 500; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); margin-right: 10px;">
-                    <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">create_new_folder</i>新建文件夹
+                  <a class="waves-effect waves-light btn btn-primary modal-trigger" data-target="modal-create-folder">
+                    <i class="material-icons left">create_new_folder</i>新建文件夹
                   </a>
-                  <button @click="toggleMultiSelect" class="btn waves-effect waves-light" :style="multiSelectMode ? 'background-color: #4CAF50;' : 'background-color: #1976D2;'">
-                    <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">check_box</i>{{ multiSelectMode ? '退出多选' : '多选' }}
+                  <button @click="toggleMultiSelect" class="btn waves-effect waves-light" :class="multiSelectMode ? 'btn-success' : 'btn-primary'">
+                    <i class="material-icons left">check_box</i>{{ multiSelectMode ? '退出多选' : '多选' }}
                   </button>
-                  <button @click="toggleViewMode" class="btn waves-effect waves-light" style="background-color: #1976D2; margin-left: 10px;">
-                    <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">{{ viewMode === 'list' ? 'grid_on' : 'view_list' }}</i>{{ viewMode === 'list' ? '缩略图' : '列表' }}
+                  <button @click="toggleViewMode" class="btn btn-secondary waves-effect waves-light">
+                    <i class="material-icons left">{{ viewMode === 'list' ? 'grid_on' : 'view_list' }}</i>{{ viewMode === 'list' ? '缩略图' : '列表' }}
                   </button>
                 </div>
               </div>
               <div class="col s6">
                 <div class="right" v-if="multiSelectMode && selectedObjects.length">
-                  <button @click="batchDeleteObjects" class="btn red waves-effect waves-light">
-                    <i class="material-icons left" style="color: white; font-size: 18px; margin-right: 6px;">delete</i>删除选中 ({{ selectedObjects.length }})
+                  <button @click="batchDeleteObjects" class="btn btn-danger waves-effect waves-light">
+                    <i class="material-icons left">delete</i>删除选中 ({{ selectedObjects.length }})
                   </button>
                 </div>
               </div>
@@ -61,16 +65,16 @@
               <div class="row">
                 <div class="col s12">
                   <div class="row" style="margin-bottom: 0;">
-                    <div class="col s10">
-                      <h6 style="margin-top: 0; color: #666;">
-                        <i class="material-icons left">cloud_upload</i>文件上传
-                      </h6>
-                    </div>
-                    <div class="col s2">
-                      <button @click="closeUploadPanel" class="btn-floating btn-small grey waves-effect waves-light">
-                        <i class="material-icons">close</i>
-                      </button>
-                    </div>
+                <div class="col s10">
+                  <h6 style="margin-top: 0; color: var(--color-text-secondary);">
+                    <i class="material-icons left">cloud_upload</i>文件上传
+                  </h6>
+                </div>
+                <div class="col s2">
+                  <button @click="closeUploadPanel" class="btn-floating btn-small btn-secondary waves-effect waves-light">
+                    <i class="material-icons">close</i>
+                  </button>
+                </div>
                   </div>
                 </div>
               </div>
@@ -131,12 +135,12 @@
               <!-- 上传按钮 -->
               <div v-if="uploadFiles.length" class="row" style="margin-top: 15px;">
                 <div class="col s12 center">
-                  <button @click="uploadSelectedFiles" :disabled="isUploading" class="btn-large waves-effect waves-light" style="background-color: #1976D2;">
-                    <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">cloud_upload</i>
+                  <button @click="uploadSelectedFiles" :disabled="isUploading" class="btn-large btn-primary waves-effect waves-light">
+                    <i class="material-icons left">cloud_upload</i>
                     {{ isUploading ? '正在上传...' : `上传 ${uploadFiles.length} 个文件` }}
                   </button>
-                  <button @click="clearUploadFiles" class="btn-flat waves-effect waves-light" style="margin-left: 10px;">
-                    <i class="material-icons left" style="color: #666; font-size: 18px; margin-right: 6px;">clear</i>清空选择
+                  <button @click="clearUploadFiles" class="btn-flat waves-effect waves-light" style="margin-left: var(--spacing-md);">
+                    <i class="material-icons left" style="color: var(--color-text-secondary);">clear</i>清空选择
                   </button>
                 </div>
               </div>
@@ -172,10 +176,10 @@
               <td>{{ object.IsFolder ? '-' : formatFileSize(object.Size) }}</td>
               <td>{{ formatDateTime(object.LastModified) }}</td>
               <td>
-                <button v-if="!object.IsFolder && isImageFile(object.Key)" @click="copyImageUrl(object.Key)" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2; margin-right: 5px;" :title="'复制图片链接'">
+                <button v-if="!object.IsFolder && isImageFile(object.Key)" @click="copyImageUrl(object.Key)" class="btn-floating btn-small btn-primary waves-effect waves-light" style="margin-right: var(--xs);" title="复制图片链接">
                   <i class="material-icons">content_copy</i>
                 </button>
-                <button v-if="!object.IsFolder" @click="deleteSingleObject(object.Key)" class="btn-floating btn-small waves-effect waves-light red" :title="'删除文件'">
+                <button v-if="!object.IsFolder" @click="deleteSingleObject(object.Key)" class="btn-floating btn-small btn-danger waves-effect waves-light" title="删除文件">
                   <i class="material-icons">delete</i>
                 </button>
               </td>
@@ -207,10 +211,10 @@
             </div>
             <!-- 操作按钮 -->
             <div class="thumbnail-actions">
-              <button v-if="!object.IsFolder && isImageFile(object.Key)" @click.stop="copyImageUrl(object.Key)" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2;" title="复制图片链接">
+              <button v-if="!object.IsFolder && isImageFile(object.Key)" @click.stop="copyImageUrl(object.Key)" class="btn-floating btn-small btn-primary waves-effect waves-light" title="复制图片链接">
                 <i class="material-icons">content_copy</i>
               </button>
-              <button v-if="!object.IsFolder" @click.stop="deleteSingleObject(object.Key)" class="btn-floating btn-small waves-effect waves-light red" title="删除文件">
+              <button v-if="!object.IsFolder" @click.stop="deleteSingleObject(object.Key)" class="btn-floating btn-small btn-danger waves-effect waves-light" title="删除文件">
                 <i class="material-icons">delete</i>
               </button>
             </div>
@@ -257,7 +261,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="modal-close waves-effect waves-green btn-flat">取消</button>
-            <button type="submit" class="waves-effect waves-green btn">创建</button>
+            <button type="submit" class="waves-effect waves-green btn btn-primary">创建</button>
           </div>
         </form>
       </div>
@@ -269,13 +273,13 @@
           <div class="lightbox-header">
             <span class="lightbox-title">{{ previewImage.name }}</span>
             <div class="lightbox-header-actions">
-              <a :href="previewImage.url" target="_blank" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2;" title="新窗口打开">
+              <a :href="previewImage.url" target="_blank" class="btn-floating btn-small btn-primary waves-effect waves-light" title="新窗口打开">
                 <i class="material-icons">open_in_new</i>
               </a>
-              <button @click.stop="copyPreviewUrl" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2; margin-left: 8px;" title="复制链接">
+              <button @click.stop="copyPreviewUrl" class="btn-floating btn-small btn-primary waves-effect waves-light" style="margin-left: var(--spacing-sm);" title="复制链接">
                 <i class="material-icons">content_copy</i>
               </button>
-              <button @click.stop="closePreview" class="btn-floating btn-small waves-effect waves-light red" style="margin-left: 8px;" title="关闭">
+              <button @click.stop="closePreview" class="btn-floating btn-small btn-danger waves-effect waves-light" style="margin-left: var(--spacing-sm);" title="关闭">
                 <i class="material-icons">close</i>
               </button>
             </div>
@@ -1090,6 +1094,138 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
   </script>
 
   <style scoped>
+  /* ========== 页面工具栏 ========== */
+  .page-toolbar {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-md) 0;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .toolbar-container {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-2xl);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .page-title-link {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    text-decoration: none;
+    color: var(--color-text);
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+  }
+
+  .page-title-link i {
+    font-size: 22px;
+    color: var(--color-text-secondary);
+  }
+
+  .page-title {
+    color: var(--color-text);
+  }
+
+  .toolbar-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-md);
+  }
+
+  .breadcrumb-link {
+    color: var(--color-primary);
+    text-decoration: none;
+  }
+
+  .breadcrumb-link:hover {
+    color: var(--color-primary-hover);
+    text-decoration: underline;
+  }
+
+  .breadcrumb-link:not(:last-child)::after {
+    content: '/';
+    margin-left: var(--spacing-xs);
+    color: var(--color-text-secondary);
+  }
+
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  /* ========== 页面内容区域 ========== */
+  .page-content {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-2xl) var(--spacing-2xl);
+  }
+
+  /* ========== 按钮样式覆盖 ========== */
+  .btn-primary {
+    background-color: var(--color-primary) !important;
+    color: white !important;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-primary-hover) !important;
+  }
+
+  .btn-primary i {
+    color: white !important;
+  }
+
+  .btn-secondary {
+    background-color: var(--color-surface) !important;
+    color: var(--color-text) !important;
+    border: 1px solid var(--color-border) !important;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-bg) !important;
+  }
+
+  .btn-secondary i {
+    color: var(--color-text-secondary) !important;
+  }
+
+  .btn-danger {
+    background-color: var(--color-danger) !important;
+    color: white !important;
+  }
+
+  .btn-danger:hover {
+    background-color: var(--color-danger-hover) !important;
+  }
+
+  .btn-danger i {
+    color: white !important;
+  }
+
+  .btn-success {
+    background-color: var(--color-success) !important;
+    color: white !important;
+  }
+
+  .btn-success:hover {
+    background-color: var(--color-success-hover) !important;
+  }
+
+  .btn-success i {
+    color: white !important;
+  }
+
   /* ========== 缩略图网格视图 ========== */
   .thumbnail-grid {
     display: flex;
@@ -1193,7 +1329,7 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
   }
 
   .folder-icon-bg {
-    background: #E3F2FD;
+    background: var(--color-primary-light);
   }
 
   .thumbnail-icon-container i.large {
