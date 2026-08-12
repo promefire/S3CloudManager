@@ -183,7 +183,7 @@
               <td>{{ object.IsFolder ? '-' : formatFileSize(object.Size) }}</td>
               <td>{{ formatDateTime(object.LastModified) }}</td>
               <td>
-                <button v-if="!object.IsFolder && isImageFile(object.Key)" @click="copyImageUrl(object.Key)" class="btn-floating btn-small btn-primary waves-effect waves-light" style="margin-right: var(--xs);" title="复制图片链接">
+                <button v-if="!object.IsFolder && isImageFile(object.Key)" @click="showCopyMenu(object.Key, object.DisplayName)" class="btn-floating btn-small btn-primary waves-effect waves-light" style="margin-right: var(--xs);" title="复制图片链接">
                   <i class="material-icons">content_copy</i>
                 </button>
                 <button v-if="!object.IsFolder" @click="deleteSingleObject(object.Key)" class="btn-floating btn-small btn-danger waves-effect waves-light" title="删除文件">
@@ -222,7 +222,7 @@
             </div>
             <!-- 操作按钮 -->
             <div class="thumbnail-actions" v-if="!multiSelectMode">
-              <button v-if="!object.IsFolder && isImageFile(object.Key)" @click.stop="copyImageUrl(object.Key)" class="btn-floating btn-small btn-primary waves-effect waves-light" title="复制图片链接">
+              <button v-if="!object.IsFolder && isImageFile(object.Key)" @click.stop="showCopyMenu(object.Key, object.DisplayName)" class="btn-floating btn-small btn-primary waves-effect waves-light" title="复制图片链接">
                 <i class="material-icons">content_copy</i>
               </button>
               <button v-if="!object.IsFolder" @click.stop="deleteSingleObject(object.Key)" class="btn-floating btn-small btn-danger waves-effect waves-light" title="删除文件">
@@ -277,6 +277,35 @@
         </form>
       </div>
 
+      <!-- 复制格式选择菜单 -->
+      <div v-if="copyMenu.visible" class="copy-format-overlay" @click="hideCopyMenu">
+        <div class="copy-format-menu" @click.stop>
+          <div class="copy-format-header">
+            <span>选择复制格式</span>
+          </div>
+          <div class="copy-format-item" @click="copyWithFormat('url')">
+            <i class="material-icons">link</i>
+            <span class="copy-format-label">URL</span>
+            <span class="copy-format-preview">{{ getImageRealUrl(copyMenu.objectKey) }}</span>
+          </div>
+          <div class="copy-format-item" @click="copyWithFormat('markdown')">
+            <i class="material-icons">code</i>
+            <span class="copy-format-label">Markdown</span>
+            <span class="copy-format-preview">![{{ getAltText(copyMenu.filename) }}]({{ getImageRealUrl(copyMenu.objectKey) }})</span>
+          </div>
+          <div class="copy-format-item" @click="copyWithFormat('html')">
+            <i class="material-icons">code</i>
+            <span class="copy-format-label">HTML</span>
+            <span class="copy-format-preview">&lt;img src=&quot;...&quot; alt=&quot;...&quot; /&gt;</span>
+          </div>
+          <div class="copy-format-item" @click="copyWithFormat('bbcode')">
+            <i class="material-icons">code</i>
+            <span class="copy-format-label">BBCode</span>
+            <span class="copy-format-preview">[img]...[/img]</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 图片预览 Lightbox -->
       <div v-if="previewImage" class="image-lightbox" @click="closePreview" @keydown.esc="closePreview" tabindex="0" ref="lightbox">
         <div class="lightbox-overlay" @click.stop="closePreview"></div>
@@ -287,7 +316,7 @@
               <a :href="previewImage.url" target="_blank" class="btn-floating btn-small btn-primary waves-effect waves-light" title="新窗口打开">
                 <i class="material-icons">open_in_new</i>
               </a>
-              <button @click.stop="copyPreviewUrl" class="btn-floating btn-small btn-primary waves-effect waves-light" style="margin-left: var(--spacing-sm);" title="复制链接">
+              <button @click.stop="showCopyMenu(previewImage.url.replace(IMAGE_DOMAIN + '/', ''), previewImage.name)" class="btn-floating btn-small btn-primary waves-effect waves-light" style="margin-left: var(--spacing-sm);" title="复制链接">
                 <i class="material-icons">content_copy</i>
               </button>
               <button @click.stop="closePreview" class="btn-floating btn-small btn-danger waves-effect waves-light" style="margin-left: var(--spacing-sm);" title="关闭">
@@ -339,7 +368,12 @@ export default {
         previewImage: null,
         convertToWebp: false,
         webpQuality: 0.85,
-        renameByTime: false
+        renameByTime: false,
+        copyMenu: {
+          visible: false,
+          objectKey: '',
+          filename: ''
+        }
       }
     },
     mounted() {
@@ -364,12 +398,17 @@ export default {
           // 如果当前路径不为空，使用 browse 接口来浏览文件夹
           if (this.currentPath && this.currentPath.length > 0) {
             console.log('Using browse API for folder:', this.currentPath);
-            console.log('browseFolder will be called with:', this.bucketName, this.currentPath);
+            // 去除 bucket 前缀，因为 API URL 中已经包含 bucket 名
+            let pathOnly = this.currentPath;
+            if (pathOnly.startsWith(this.bucketName + '/')) {
+              pathOnly = pathOnly.substring(this.bucketName.length + 1);
+            }
+            console.log('browseFolder will be called with:', this.bucketName, pathOnly);
             const params = {
               page: this.pagination.current_page,
               page_size: this.pagination.page_size
             };
-            url = API_ENDPOINTS.browseFolder(this.bucketName, this.currentPath, params);
+            url = API_ENDPOINTS.browseFolder(this.bucketName, pathOnly, params);
           } else {
             console.log('Using objects API for root directory');
             // 如果当前路径为空，使用 objects 接口来列出根目录对象
@@ -770,25 +809,64 @@ export default {
         document.body.style.overflow = '';
       },
 
-      // 复制预览图片URL
-      async copyPreviewUrl() {
-        if (!this.previewImage) return;
+      // 显示复制格式选择菜单
+      showCopyMenu(objectKey, filename) {
+        this.copyMenu = {
+          visible: true,
+          objectKey,
+          filename
+        };
+      },
+
+      // 隐藏复制格式选择菜单
+      hideCopyMenu() {
+        this.copyMenu.visible = false;
+      },
+
+      // 获取 alt 文本（去掉扩展名的文件名）
+      getAltText(filename) {
+        if (!filename) return '';
+        return filename.replace(/\.[^.]+$/, '');
+      },
+
+      // 生成指定格式的复制文本
+      getCopyText(objectKey, filename, format) {
+        const url = this.getImageRealUrl(objectKey);
+        const alt = this.getAltText(filename);
+        switch (format) {
+          case 'markdown':
+            return `![${alt}](${url})`;
+          case 'html':
+            return `<img src="${url}" alt="${alt}" />`;
+          case 'bbcode':
+            return `[img]${url}[/img]`;
+          case 'url':
+          default:
+            return url;
+        }
+      },
+
+      // 按指定格式复制到剪贴板
+      async copyWithFormat(format) {
+        const { objectKey, filename } = this.copyMenu;
+        const text = this.getCopyText(objectKey, filename, format);
         try {
-          await navigator.clipboard.writeText(this.previewImage.url);
-          M.toast({ html: '图片链接已复制到剪贴板', classes: 'green' });
+          await navigator.clipboard.writeText(text);
+          M.toast({ html: '已复制到剪贴板', classes: 'green' });
         } catch (error) {
           const textArea = document.createElement('textarea');
-          textArea.value = this.previewImage.url;
+          textArea.value = text;
           document.body.appendChild(textArea);
           textArea.select();
           try {
             document.execCommand('copy');
-            M.toast({ html: '图片链接已复制到剪贴板', classes: 'green' });
+            M.toast({ html: '已复制到剪贴板', classes: 'green' });
           } catch (fallbackError) {
             M.toast({ html: '复制失败，请手动复制', classes: 'red' });
           }
           document.body.removeChild(textArea);
         }
+        this.hideCopyMenu();
       },
 
       // 图片加载失败处理
@@ -2048,5 +2126,80 @@ export default {
     margin: 4px 0 0 24px;
     font-size: var(--font-size-xs);
     color: var(--color-text-secondary);
+  }
+
+  /* ========== 复制格式选择菜单 ========== */
+  .copy-format-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    animation: fadeIn 0.15s ease;
+  }
+
+  .copy-format-menu {
+    background: var(--color-surface);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    width: 360px;
+    max-width: 90vw;
+    overflow: hidden;
+    animation: slideUp 0.2s ease;
+  }
+
+  .copy-format-header {
+    padding: 14px 20px;
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-text);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .copy-format-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .copy-format-item:hover {
+    background: var(--color-primary-light);
+  }
+
+  .copy-format-item:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .copy-format-item i {
+    font-size: 20px;
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  .copy-format-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text);
+    min-width: 70px;
+    flex-shrink: 0;
+  }
+
+  .copy-format-preview {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
   }
   </style>
