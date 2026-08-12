@@ -328,7 +328,13 @@
             </div>
           </div>
           <div class="lightbox-body">
+            <button class="lightbox-nav lightbox-nav-prev" @click.stop="prevImage" title="上一张 (←)">
+              <i class="material-icons">chevron_left</i>
+            </button>
             <img :src="previewImage.url" :alt="previewImage.name" class="lightbox-image" />
+            <button class="lightbox-nav lightbox-nav-next" @click.stop="nextImage" title="下一张 (→)">
+              <i class="material-icons">chevron_right</i>
+            </button>
           </div>
           <div class="lightbox-footer" v-if="previewImage.size || previewImage.date">
             <span v-if="previewImage.size">{{ previewImage.size }}</span>
@@ -378,7 +384,8 @@ export default {
           filename: ''
         },
         loadedImages: {},
-        imageObserver: null
+        imageObserver: null,
+        currentImageIndex: 0
       }
     },
     mounted() {
@@ -807,6 +814,8 @@ export default {
 
       // 打开图片预览
       openPreview(object) {
+        // 找到当前图片在图片列表中的索引（仅图片，排除文件夹）
+        this.currentImageIndex = this.getImageIndex(object.Key);
         this.previewImage = {
           name: object.DisplayName,
           url: this.getImageRealUrl(object.Key),
@@ -819,6 +828,49 @@ export default {
             this.$refs.lightbox.focus();
           }
         });
+      },
+
+      // 获取当前图片在图片列表中的索引
+      getImageIndex(objectKey) {
+        const imageObjects = this.objects.filter(obj => !obj.IsFolder && this.isImageFile(obj.Key));
+        return imageObjects.findIndex(obj => obj.Key === objectKey);
+      },
+
+      // 获取所有图片对象（排除文件夹）
+      getImageObjects() {
+        return this.objects.filter(obj => !obj.IsFolder && this.isImageFile(obj.Key));
+      },
+
+      // 切换到上一张图片
+      prevImage() {
+        const images = this.getImageObjects();
+        if (!images.length) return;
+        // 如果是第一张，跳到最后一张（循环）
+        const newIndex = this.currentImageIndex <= 0 ? images.length - 1 : this.currentImageIndex - 1;
+        this.currentImageIndex = newIndex;
+        const obj = images[newIndex];
+        this.previewImage = {
+          name: obj.DisplayName,
+          url: this.getImageRealUrl(obj.Key),
+          size: obj.Size ? this.formatFileSize(obj.Size) : '',
+          date: obj.LastModified ? this.formatDateTime(obj.LastModified) : ''
+        };
+      },
+
+      // 切换到下一张图片
+      nextImage() {
+        const images = this.getImageObjects();
+        if (!images.length) return;
+        // 如果是最后一张，跳到第一张（循环）
+        const newIndex = this.currentImageIndex >= images.length - 1 ? 0 : this.currentImageIndex + 1;
+        this.currentImageIndex = newIndex;
+        const obj = images[newIndex];
+        this.previewImage = {
+          name: obj.DisplayName,
+          url: this.getImageRealUrl(obj.Key),
+          size: obj.Size ? this.formatFileSize(obj.Size) : '',
+          date: obj.LastModified ? this.formatDateTime(obj.LastModified) : ''
+        };
       },
 
       // 关闭图片预览
@@ -937,8 +989,13 @@ export default {
 
       // 键盘事件处理
       handleKeydown(event) {
-        if (event.key === 'Escape' && this.previewImage) {
+        if (!this.previewImage) return;
+        if (event.key === 'Escape') {
           this.closePreview();
+        } else if (event.key === 'ArrowLeft') {
+          this.prevImage();
+        } else if (event.key === 'ArrowRight') {
+          this.nextImage();
         }
       },
       
@@ -1787,10 +1844,11 @@ export default {
     justify-content: center;
     background: rgba(0, 0, 0, 0.3);
     min-height: 200px;
+    position: relative;
   }
 
   .lightbox-image {
-    max-width: 85vw;
+    max-width: 75vw;
     max-height: 75vh;
     object-fit: contain;
     border-radius: 4px;
@@ -1803,6 +1861,41 @@ export default {
     color: rgba(255, 255, 255, 0.7);
     font-size: 12px;
     text-align: center;
+  }
+
+  /* ========== Lightbox 导航箭头 ========== */
+  .lightbox-nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    z-index: 10002;
+  }
+
+  .lightbox-nav:hover {
+    background: rgba(0, 0, 0, 0.65);
+  }
+
+  .lightbox-nav i {
+    color: white;
+    font-size: 36px;
+  }
+
+  .lightbox-nav-prev {
+    left: 24px;
+  }
+
+  .lightbox-nav-next {
+    right: 24px;
   }
 
   /* ========== 上传文件浮层 ========== */
