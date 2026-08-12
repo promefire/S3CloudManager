@@ -298,11 +298,10 @@
   
   <script>
   /* global M */
-import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
+import { API_ENDPOINTS, IMAGE_DOMAIN, getHeaders } from '../config/api.js';
   
-  // eslint-disable-next-line vue/multi-word-component-names
-  export default {
-    name: 'Bucket',
+export default {
+  name: 'Bucket',
     props: ['bucketName'],
     data() {
       return {
@@ -369,7 +368,7 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
             url = API_ENDPOINTS.bucketObjects(this.bucketName, params);
           }
           console.log('Fetching objects from:', url);
-          const response = await fetch(url);
+          const response = await fetch(url, { headers: getHeaders() });
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
@@ -523,7 +522,8 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
         
         try {
           const response = await fetch(API_ENDPOINTS.bucket(this.bucketName), {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getHeaders()
           });
           
           if (!response.ok) {
@@ -583,7 +583,8 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
         
         try {
           const response = await fetch(API_ENDPOINTS.bucketObject(this.bucketName, key), {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getHeaders()
           });
           
           if (!response.ok) {
@@ -744,6 +745,7 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...getHeaders()
             },
             body: JSON.stringify({ folder_name: folderName.trim() })
           });
@@ -784,6 +786,7 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
             
             const response = await fetch(API_ENDPOINTS.uploadObject(this.bucketName), {
               method: 'POST',
+              headers: getHeaders(),
               body: formData
             });
             
@@ -906,6 +909,7 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...getHeaders()
             },
             body: JSON.stringify({ objects: [objectKey] })
           });
@@ -939,6 +943,7 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...getHeaders()
             },
             body: JSON.stringify({ objects: this.selectedObjects })
           });

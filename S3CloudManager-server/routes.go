@@ -8,40 +8,167 @@ import (
 )
 
 // 设置路由
-func setupRoutes(router *gin.Engine, s3Client *minio.Client) {
-	handler := app.NewHandler(s3Client)
-	
-	// 健康检查
-	router.GET("/api/health", handler.HealthCheck)
+func setupRoutes(router *gin.Engine) {
+	// 健康检查（GET - 不需要 S3 配置，返回服务状态）
+	router.GET("/api/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":  "ok",
+			"message": "服务运行正常",
+			"config_required": true,
+		})
+	})
+
+	// 测试连接（POST - 前端传入 S3 配置进行测试）
+	router.POST("/api/health", func(c *gin.Context) {
+		clientObj, exists := c.Get("s3Client")
+		if !exists || clientObj == nil {
+			c.JSON(400, gin.H{
+				"error": "S3 配置无效",
+			})
+			return
+		}
+		s3Client, ok := clientObj.(*minio.Client)
+		if !ok {
+			c.JSON(400, gin.H{
+				"error": "S3 客户端类型错误",
+			})
+			return
+		}
+		// 实际测试 S3 连接
+		ctx := c.Request.Context()
+		buckets, err := s3Client.ListBuckets(ctx)
+		if err != nil {
+			c.JSON(400, gin.H{
+				"error": "连接失败: " + err.Error(),
+			})
+			return
+		}
+		c.JSON(200, gin.H{
+			"status":  "ok",
+			"message": "连接成功",
+			"buckets": len(buckets),
+		})
+	})
 
 	// API v1 路由
 	api := router.Group("/api/v1")
 	{
 		// 存储桶管理
-		api.GET("/buckets", handler.ListBuckets)             // 列出所有存储桶
-		api.POST("/buckets", handler.CreateBucket)           // 创建存储桶
-		api.DELETE("/buckets/:bucket", handler.DeleteBucket) // 删除存储桶
+		api.GET("/buckets", func(c *gin.Context) {
+			client, exists := c.Get("s3Client")
+			if !exists || client == nil {
+				c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+				return
+			}
+			handler := app.NewHandler(client.(*minio.Client))
+			handler.ListBuckets(c)
+		})
 
-		// 对象管理 - 使用不同的路径来避免冲突
+		api.POST("/buckets", func(c *gin.Context) {
+			client, exists := c.Get("s3Client")
+			if !exists || client == nil {
+				c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+				return
+			}
+			handler := app.NewHandler(client.(*minio.Client))
+			handler.CreateBucket(c)
+		})
+
+		api.DELETE("/buckets/:bucket", func(c *gin.Context) {
+			client, exists := c.Get("s3Client")
+			if !exists || client == nil {
+				c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+				return
+			}
+			handler := app.NewHandler(client.(*minio.Client))
+			handler.DeleteBucket(c)
+		})
+
+		// 对象管理
 		buckets := api.Group("/buckets/:bucket")
 		{
-			// 列出对象和上传
-			buckets.GET("/objects", handler.ListObjects)                      // 列出对象（支持分页和文件夹浏览）
-			buckets.POST("/objects", handler.UploadObject)                    // 上传对象
-			buckets.POST("/folders", handler.CreateFolder)                    // 创建文件夹
-			buckets.POST("/objects/batch-delete", handler.BatchDeleteObjects) // 批量删除对象
+			buckets.GET("/objects", func(c *gin.Context) {
+				client, exists := c.Get("s3Client")
+				if !exists || client == nil {
+					c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+					return
+				}
+				handler := app.NewHandler(client.(*minio.Client))
+				handler.ListObjects(c)
+			})
 
-			// 对象操作 - 使用专门的路径前缀来避免通配符冲突
+			buckets.POST("/objects", func(c *gin.Context) {
+				client, exists := c.Get("s3Client")
+				if !exists || client == nil {
+					c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+					return
+				}
+				handler := app.NewHandler(client.(*minio.Client))
+				handler.UploadObject(c)
+			})
+
+			buckets.POST("/folders", func(c *gin.Context) {
+				client, exists := c.Get("s3Client")
+				if !exists || client == nil {
+					c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+					return
+				}
+				handler := app.NewHandler(client.(*minio.Client))
+				handler.CreateFolder(c)
+			})
+
+			buckets.POST("/objects/batch-delete", func(c *gin.Context) {
+				client, exists := c.Get("s3Client")
+				if !exists || client == nil {
+					c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+					return
+				}
+				handler := app.NewHandler(client.(*minio.Client))
+				handler.BatchDeleteObjects(c)
+			})
+
 			objectsApi := buckets.Group("/api/objects")
 			{
-				objectsApi.GET("/:object/info", handler.GetObjectInfo) // 获取对象信息
-				objectsApi.PUT("/:object", handler.UpdateObject)       // 更新对象
-				objectsApi.DELETE("/:object", handler.DeleteObject)    // 删除对象
+				objectsApi.GET("/:object/info", func(c *gin.Context) {
+					client, exists := c.Get("s3Client")
+					if !exists || client == nil {
+						c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+						return
+					}
+					handler := app.NewHandler(client.(*minio.Client))
+					handler.GetObjectInfo(c)
+				})
+
+				objectsApi.PUT("/:object", func(c *gin.Context) {
+					client, exists := c.Get("s3Client")
+					if !exists || client == nil {
+						c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+						return
+					}
+					handler := app.NewHandler(client.(*minio.Client))
+					handler.UpdateObject(c)
+				})
+
+				objectsApi.DELETE("/:object", func(c *gin.Context) {
+					client, exists := c.Get("s3Client")
+					if !exists || client == nil {
+						c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+						return
+					}
+					handler := app.NewHandler(client.(*minio.Client))
+					handler.DeleteObject(c)
+				})
 			}
 
-			// 文件下载和文件夹浏览 - 放在最后，使用通配符
-			buckets.GET("/browse/*filepath", handler.DownloadOrListObjects) // 浏览文件夹或下载文件
+			buckets.GET("/browse/*filepath", func(c *gin.Context) {
+				client, exists := c.Get("s3Client")
+				if !exists || client == nil {
+					c.JSON(400, gin.H{"error": "未配置 S3 连接信息"})
+					return
+				}
+				handler := app.NewHandler(client.(*minio.Client))
+				handler.DownloadOrListObjects(c)
+			})
 		}
 	}
-
 }

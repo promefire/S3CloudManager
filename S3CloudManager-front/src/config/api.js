@@ -1,4 +1,6 @@
 // API 配置文件
+import { getConfigForRequest } from './storage.js';
+
 const config = {
   // 开发环境配置
   development: {
@@ -16,6 +18,22 @@ const apiConfig = config[env];
 
 // 导出 API 基础 URL
 export const API_BASE_URL = apiConfig.baseURL;
+
+/**
+ * 获取请求头（包含 S3 配置）
+ * 如果用户在前端配置了 S3 连接信息，则附带在请求头中
+ */
+export function getHeaders() {
+  const headers = {};
+  const configData = getConfigForRequest();
+  if (configData) {
+    // 将明文配置以 JSON 形式放在自定义请求头中
+    // 注意：这里使用明文传输，依赖 HTTPS 保证传输安全
+    // 存储在 localStorage 时是加密的
+    headers['X-S3-Config'] = JSON.stringify(configData);
+  }
+  return headers;
+}
 
 // 导出常用的 API 端点
 export const API_ENDPOINTS = {

@@ -44,9 +44,8 @@
 
 <script>
 /* global M */
-import { API_ENDPOINTS } from '../config/api.js';
+import { API_ENDPOINTS, getHeaders } from '../config/api.js';
 
-// eslint-disable-next-line vue/multi-word-component-names
 export default {
   name: 'Buckets',
   data() {
@@ -62,7 +61,9 @@ export default {
   methods: {
     async fetchBuckets() {
       try {
-        const response = await fetch(API_ENDPOINTS.buckets);
+        const response = await fetch(API_ENDPOINTS.buckets, {
+          headers: getHeaders()
+        });
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -79,6 +80,7 @@ export default {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...getHeaders()
           },
           body: JSON.stringify({ name: this.newBucketName, region: "us-east-1" })
         });

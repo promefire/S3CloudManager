@@ -10,6 +10,9 @@
           </a>
         </div>
         <div class="header-right">
+          <!-- 设置按钮 -->
+          <SettingsModal ref="settingsModal" @config-saved="onConfigSaved" @config-cleared="onConfigCleared" />
+          <!-- 用户菜单 -->
           <div class="user-menu" @click="toggleUserMenu" ref="userMenu">
             <div class="user-avatar">{{ username.charAt(0).toUpperCase() }}</div>
             <span class="user-name">{{ username }}</span>
@@ -42,8 +45,13 @@
 
 <script>
 /* global M */
+import SettingsModal from './components/SettingsModal.vue'
+
 export default {
   name: 'App',
+  components: {
+    SettingsModal
+  },
   data() {
     return {
       isLoggedIn: false,
@@ -72,6 +80,24 @@ export default {
       if (this.$refs.userMenu && !this.$refs.userMenu.contains(event.target)) {
         this.showUserMenu = false
       }
+    },
+    openSettings() {
+      this.showUserMenu = false
+      // 触发设置模态框
+      this.$refs.settingsModal.openModal()
+    },
+    onConfigSaved() {
+      M.toast({ html: 'S3 配置已保存，正在刷新...', classes: 'green' })
+      // 配置保存后刷新当前页面以使用新配置
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    },
+    onConfigCleared() {
+      M.toast({ html: '配置已清除，正在刷新...', classes: 'green' })
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
     }
   },
   mounted() {
