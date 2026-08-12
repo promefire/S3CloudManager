@@ -87,4 +87,8 @@ export const API_ENDPOINTS = {
 // 图片域名配置
 export const IMAGE_DOMAIN = process.env.VUE_APP_IMAGE_DOMAIN || 'https://img.promefire.top';
 
+// 缩略图裁剪参数（Cloudflare Image Resizing）
+// 缩略图容器高度 160px，宽度自适应，2x 密度下 400px 足够清晰
+export const THUMBNAIL_PARAMS = 'width=400&format=webp&quality=75';
+
 export default apiConfig; 

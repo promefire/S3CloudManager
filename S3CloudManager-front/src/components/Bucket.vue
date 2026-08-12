@@ -196,7 +196,7 @@
 
         <!-- 缩略图视图 -->
         <div v-if="objects.length && viewMode === 'thumbnail'" class="thumbnail-grid">
-          <div v-for="(object, index) in objects" :key="index" class="thumbnail-item">
+          <div v-for="object in objects" :key="`${pagination.current_page}-${object.Key}`" class="thumbnail-item">
             <div class="thumbnail-card" :class="{ 'folder-card': object.IsFolder, 'selected': !object.IsFolder && multiSelectMode && selectedObjects.includes(object.Key) }" @click="object.IsFolder ? handleObjectClick(object) : (multiSelectMode ? toggleObjectSelection(object.Key) : handleObjectClick(object))">
               <!-- 多选复选框 -->
               <div v-if="!object.IsFolder && multiSelectMode" class="thumbnail-checkbox" @click.stop="toggleObjectSelection(object.Key)">
@@ -204,7 +204,10 @@
               </div>
               <!-- 图片缩略图 -->
               <div v-if="isImageFile(object.Key)" class="thumbnail-image-container">
-                <img :src="getImageRealUrl(object.Key)" :alt="object.DisplayName" class="thumbnail-image" loading="lazy" @error="handleImageError($event)" />
+                <img :data-src="getThumbnailUrl(object.Key)" :alt="object.DisplayName" class="thumbnail-image lazy-image" @error="handleImageError($event)" />
+                <div class="lazy-placeholder">
+                  <i class="material-icons">image</i>
+                </div>
                 <div class="thumbnail-overlay" v-if="!multiSelectMode">
                   <i class="material-icons">zoom_in</i>
                 </div>
@@ -338,7 +341,7 @@
   
   <script>
   /* global M */
-import { API_ENDPOINTS, IMAGE_DOMAIN, getHeaders } from '../config/api.js';
+import { API_ENDPOINTS, IMAGE_DOMAIN, THUMBNAIL_PARAMS, getHeaders } from '../config/api.js';
   
 export default {
   name: 'Bucket',
@@ -373,18 +376,24 @@ export default {
           visible: false,
           objectKey: '',
           filename: ''
-        }
+        },
+        loadedImages: {},
+        imageObserver: null
       }
     },
     mounted() {
       this.fetchObjects();
       M.Modal.init(document.querySelectorAll('.modal'));
       document.addEventListener('keydown', this.handleKeydown);
+      this.initImageObserver();
     },
 
     beforeUnmount() {
       document.removeEventListener('keydown', this.handleKeydown);
       document.body.style.overflow = '';
+      if (this.imageObserver) {
+        this.imageObserver.disconnect();
+      }
     },
     methods: {
       async fetchObjects() {
@@ -399,16 +408,17 @@ export default {
           if (this.currentPath && this.currentPath.length > 0) {
             console.log('Using browse API for folder:', this.currentPath);
             // 去除 bucket 前缀，因为 API URL 中已经包含 bucket 名
-            let pathOnly = this.currentPath;
-            if (pathOnly.startsWith(this.bucketName + '/')) {
-              pathOnly = pathOnly.substring(this.bucketName.length + 1);
-            }
-            console.log('browseFolder will be called with:', this.bucketName, pathOnly);
+       //     let pathOnly = this.currentPath;
+       //     if (pathOnly.startsWith(this.bucketName + '/')) {
+       //       pathOnly = pathOnly.substring(this.bucketName.length + 1);
+       //     }
+       //     console.log('browseFolder will be called with:', this.bucketName, pathOnly);
             const params = {
               page: this.pagination.current_page,
               page_size: this.pagination.page_size
             };
-            url = API_ENDPOINTS.browseFolder(this.bucketName, pathOnly, params);
+             url = API_ENDPOINTS.browseFolder(this.bucketName, this.currentPath, params);
+           // url = API_ENDPOINTS.browseFolder(this.bucketName, pathOnly, params);
           } else {
             console.log('Using objects API for root directory');
             // 如果当前路径为空，使用 objects 接口来列出根目录对象
@@ -563,6 +573,9 @@ export default {
               return timeB - timeA; // 降序排列，最新的在前
             }
           });
+
+          // 数据更新后设置懒加载观察
+          this.setupLazyImages();
         } catch (error) {
           console.error('Error fetching objects:', error);
           M.toast({ html: 'Failed to load objects', classes: 'red' });
@@ -728,6 +741,11 @@ export default {
       getImageRealUrl(filename) {
         return `${IMAGE_DOMAIN}/${filename}`;
       },
+
+      // 获取缩略图URL（带CDN裁剪参数）
+      getThumbnailUrl(filename) {
+        return `${IMAGE_DOMAIN}/${filename}?${THUMBNAIL_PARAMS}`;
+      },
       
       // 处理对象点击事件
       handleObjectClick(object) {
@@ -867,6 +885,48 @@ export default {
           document.body.removeChild(textArea);
         }
         this.hideCopyMenu();
+      },
+
+      // 初始化图片懒加载观察器
+      initImageObserver() {
+        this.imageObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const img = entry.target;
+              const src = img.dataset.src;
+              if (src) {
+                // 加载完成：直接操作 DOM 移除占位符 + 添加 class（不依赖 Vue 响应式）
+                img.onload = () => {
+                  img.classList.add('loaded');
+                  const placeholder = img.parentElement.querySelector('.lazy-placeholder');
+                  if (placeholder) placeholder.remove();
+                };
+                // 加载失败：同样移除占位符，显示错误图标
+                img.onerror = () => {
+                  img.classList.add('loaded');
+                  const placeholder = img.parentElement.querySelector('.lazy-placeholder');
+                  if (placeholder) placeholder.remove();
+                  this.handleImageError({ target: img });
+                };
+                img.src = src;
+              }
+              this.imageObserver.unobserve(img);
+            }
+          });
+        }, {
+          rootMargin: '200px 0px',
+          threshold: 0.01
+        });
+      },
+
+      // 观察所有懒加载图片元素
+      setupLazyImages() {
+        this.$nextTick(() => {
+          const lazyImages = document.querySelectorAll('.lazy-image:not([src])');
+          lazyImages.forEach(img => {
+            this.imageObserver.observe(img);
+          });
+        });
       },
 
       // 图片加载失败处理
@@ -2201,5 +2261,40 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
+  }
+
+  /* ========== 图片懒加载 ========== */
+  .lazy-image {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .lazy-image.loaded {
+    opacity: 1;
+  }
+
+  .lazy-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f5f5f5 25%, #eeeeee 50%, #f5f5f5 75%);
+    background-size: 200% 200%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    z-index: 1;
+  }
+
+  .lazy-placeholder i {
+    font-size: 32px;
+    color: #ccc;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
   </style>

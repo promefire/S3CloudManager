@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <!-- 顶部 Header -->
-    <header v-if="isLoggedIn" class="app-header">
+    <header class="app-header">
       <div class="header-container">
         <div class="header-left">
           <a href="/" class="header-logo">
@@ -12,34 +12,14 @@
         <div class="header-right">
           <!-- 设置按钮 -->
           <SettingsModal ref="settingsModal" @config-saved="onConfigSaved" @config-cleared="onConfigCleared" />
-          <!-- 用户菜单 -->
-          <div class="user-menu" @click="toggleUserMenu" ref="userMenu">
-            <div class="user-avatar">{{ username.charAt(0).toUpperCase() }}</div>
-            <span class="user-name">{{ username }}</span>
-            <i class="material-icons user-arrow">expand_more</i>
-          </div>
-          <div v-if="showUserMenu" class="user-dropdown" @click.stop>
-            <div class="dropdown-header">
-              <span class="dropdown-username">{{ username }}</span>
-              <span class="dropdown-role">管理员</span>
-            </div>
-            <div class="dropdown-divider"></div>
-            <a href="#" class="dropdown-item" @click="handleLogout">
-              <i class="material-icons">logout</i>
-              <span>退出登录</span>
-            </a>
-          </div>
         </div>
       </div>
     </header>
 
     <!-- 主内容区域 -->
-    <main v-if="isLoggedIn" class="app-main">
+    <main class="app-main">
       <router-view/>
     </main>
-
-    <!-- 未登录时直接显示路由内容 -->
-    <router-view v-if="!isLoggedIn"/>
   </div>
 </template>
 
@@ -52,43 +32,12 @@ export default {
   components: {
     SettingsModal
   },
-  data() {
-    return {
-      isLoggedIn: false,
-      username: '',
-      showUserMenu: false
-    }
-  },
   methods: {
-    checkAuthStatus() {
-      this.isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'
-      this.username = localStorage.getItem('username') || ''
-    },
-    handleLogout() {
-      localStorage.removeItem('isLoggedIn')
-      localStorage.removeItem('username')
-      this.isLoggedIn = false
-      this.username = ''
-      this.showUserMenu = false
-      M.toast({ html: '已登出', classes: 'green' })
-      this.$router.push('/login')
-    },
-    toggleUserMenu() {
-      this.showUserMenu = !this.showUserMenu
-    },
-    handleClickOutside(event) {
-      if (this.$refs.userMenu && !this.$refs.userMenu.contains(event.target)) {
-        this.showUserMenu = false
-      }
-    },
     openSettings() {
-      this.showUserMenu = false
-      // 触发设置模态框
       this.$refs.settingsModal.openModal()
     },
     onConfigSaved() {
       M.toast({ html: 'S3 配置已保存，正在刷新...', classes: 'green' })
-      // 配置保存后刷新当前页面以使用新配置
       setTimeout(() => {
         window.location.reload()
       }, 1000)
@@ -99,15 +48,6 @@ export default {
         window.location.reload()
       }, 1000)
     }
-  },
-  mounted() {
-    this.checkAuthStatus()
-    window.addEventListener('storage', this.checkAuthStatus)
-    document.addEventListener('click', this.handleClickOutside)
-  },
-  beforeUnmount() {
-    window.removeEventListener('storage', this.checkAuthStatus)
-    document.removeEventListener('click', this.handleClickOutside)
   }
 }
 </script>
@@ -223,103 +163,6 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-}
-
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.user-menu:hover {
-  background-color: var(--color-bg);
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.user-name {
-  font-size: var(--font-size-md);
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.user-arrow {
-  font-size: 18px;
-  color: var(--color-text-secondary);
-}
-
-/* 用户下拉菜单 */
-.user-dropdown {
-  position: absolute;
-  top: calc(100% + var(--spacing-sm));
-  right: 0;
-  min-width: 200px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: var(--spacing-sm) 0;
-  z-index: 1001;
-}
-
-.dropdown-header {
-  padding: var(--spacing-md) var(--spacing-lg);
-}
-
-.dropdown-username {
-  display: block;
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.dropdown-role {
-  display: block;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  margin-top: 2px;
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: var(--spacing-xs) 0;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  font-size: var(--font-size-md);
-  color: var(--color-text);
-  text-decoration: none;
-  transition: background-color 0.15s ease;
-}
-
-.dropdown-item:hover {
-  background-color: var(--color-bg);
-  text-decoration: none;
-}
-
-.dropdown-item i {
-  font-size: 20px;
-  color: var(--color-text-secondary);
 }
 
 /* ========== 主内容区域 ========== */
