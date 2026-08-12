@@ -36,6 +36,9 @@
                   <button @click="toggleMultiSelect" class="btn waves-effect waves-light" :style="multiSelectMode ? 'background-color: #4CAF50;' : 'background-color: #1976D2;'">
                     <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">check_box</i>{{ multiSelectMode ? '退出多选' : '多选' }}
                   </button>
+                  <button @click="toggleViewMode" class="btn waves-effect waves-light" style="background-color: #1976D2; margin-left: 10px;">
+                    <i class="material-icons left" style="color: white; font-size: 20px; margin-right: 8px;">{{ viewMode === 'list' ? 'grid_on' : 'view_list' }}</i>{{ viewMode === 'list' ? '缩略图' : '列表' }}
+                  </button>
                 </div>
               </div>
               <div class="col s6">
@@ -141,7 +144,8 @@
           </div>
         </div>
         
-        <table class="striped" v-if="objects.length">
+        <!-- 列表视图 -->
+        <table class="striped" v-if="objects.length && viewMode === 'list'">
           <thead>
             <tr>
               <th style="width: 50px;">
@@ -178,6 +182,40 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- 缩略图视图 -->
+        <div v-if="objects.length && viewMode === 'thumbnail'" class="thumbnail-grid">
+          <div v-for="(object, index) in objects" :key="index" class="thumbnail-item">
+            <div class="thumbnail-card" :class="{ 'folder-card': object.IsFolder }" @click="handleObjectClick(object)">
+              <!-- 图片缩略图 -->
+              <div v-if="isImageFile(object.Key)" class="thumbnail-image-container">
+                <img :src="getImageRealUrl(object.Key)" :alt="object.DisplayName" class="thumbnail-image" loading="lazy" @error="handleImageError($event)" />
+                <div class="thumbnail-overlay">
+                  <i class="material-icons">zoom_in</i>
+                </div>
+              </div>
+              <!-- 文件夹图标 -->
+              <div v-else-if="object.IsFolder" class="thumbnail-icon-container folder-icon-bg">
+                <i class="material-icons large" style="color: #2196F3;">folder</i>
+              </div>
+              <!-- 其他文件图标 -->
+              <div v-else class="thumbnail-icon-container">
+                <i class="material-icons large" :style="getIconStyle(object.Icon)">{{ object.Icon }}</i>
+              </div>
+              <!-- 文件名称 -->
+              <div class="thumbnail-name" :title="object.DisplayName">{{ object.DisplayName }}</div>
+            </div>
+            <!-- 操作按钮 -->
+            <div class="thumbnail-actions">
+              <button v-if="!object.IsFolder && isImageFile(object.Key)" @click.stop="copyImageUrl(object.Key)" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2;" title="复制图片链接">
+                <i class="material-icons">content_copy</i>
+              </button>
+              <button v-if="!object.IsFolder" @click.stop="deleteSingleObject(object.Key)" class="btn-floating btn-small waves-effect waves-light red" title="删除文件">
+                <i class="material-icons">delete</i>
+              </button>
+            </div>
+          </div>
+        </div>
         
         <!-- 分页控件 -->
         <div v-if="pagination.total_pages > 1" class="row" style="margin-top: 20px;">
@@ -223,6 +261,34 @@
           </div>
         </form>
       </div>
+
+      <!-- 图片预览 Lightbox -->
+      <div v-if="previewImage" class="image-lightbox" @click="closePreview" @keydown.esc="closePreview" tabindex="0" ref="lightbox">
+        <div class="lightbox-overlay" @click.stop="closePreview"></div>
+        <div class="lightbox-container" @click.stop>
+          <div class="lightbox-header">
+            <span class="lightbox-title">{{ previewImage.name }}</span>
+            <div class="lightbox-header-actions">
+              <a :href="previewImage.url" target="_blank" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2;" title="新窗口打开">
+                <i class="material-icons">open_in_new</i>
+              </a>
+              <button @click.stop="copyPreviewUrl" class="btn-floating btn-small waves-effect waves-light" style="background-color: #1976D2; margin-left: 8px;" title="复制链接">
+                <i class="material-icons">content_copy</i>
+              </button>
+              <button @click.stop="closePreview" class="btn-floating btn-small waves-effect waves-light red" style="margin-left: 8px;" title="关闭">
+                <i class="material-icons">close</i>
+              </button>
+            </div>
+          </div>
+          <div class="lightbox-body">
+            <img :src="previewImage.url" :alt="previewImage.name" class="lightbox-image" />
+          </div>
+          <div class="lightbox-footer" v-if="previewImage.size || previewImage.date">
+            <span v-if="previewImage.size">{{ previewImage.size }}</span>
+            <span v-if="previewImage.date" style="margin-left: 15px;">{{ previewImage.date }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </template>
   
@@ -254,12 +320,20 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
         isUploading: false,
         showUploadPanel: false,
         isDragOver: false,
-        multiSelectMode: false
+        multiSelectMode: false,
+        viewMode: 'list',
+        previewImage: null
       }
     },
     mounted() {
       this.fetchObjects();
       M.Modal.init(document.querySelectorAll('.modal'));
+      document.addEventListener('keydown', this.handleKeydown);
+    },
+
+    beforeUnmount() {
+      document.removeEventListener('keydown', this.handleKeydown);
+      document.body.style.overflow = '';
     },
     methods: {
       async fetchObjects() {
@@ -545,11 +619,71 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
           // 如果是文件夹，导航到文件夹
           this.navigateTo(object.Key);
         } else if (this.isImageFile(object.Key)) {
-          // 如果是图片文件，打开真实URL
-          const imageUrl = this.getImageRealUrl(object.Key);
-          window.open(imageUrl, '_blank');
+          // 如果是图片文件，打开预览
+          this.openPreview(object);
         }
         // 其他文件类型不处理点击事件
+      },
+
+      // 切换视图模式
+      toggleViewMode() {
+        this.viewMode = this.viewMode === 'list' ? 'thumbnail' : 'list';
+      },
+
+      // 打开图片预览
+      openPreview(object) {
+        this.previewImage = {
+          name: object.DisplayName,
+          url: this.getImageRealUrl(object.Key),
+          size: object.Size ? this.formatFileSize(object.Size) : '',
+          date: object.LastModified ? this.formatDateTime(object.LastModified) : ''
+        };
+        document.body.style.overflow = 'hidden';
+        this.$nextTick(() => {
+          if (this.$refs.lightbox) {
+            this.$refs.lightbox.focus();
+          }
+        });
+      },
+
+      // 关闭图片预览
+      closePreview() {
+        this.previewImage = null;
+        document.body.style.overflow = '';
+      },
+
+      // 复制预览图片URL
+      async copyPreviewUrl() {
+        if (!this.previewImage) return;
+        try {
+          await navigator.clipboard.writeText(this.previewImage.url);
+          M.toast({ html: '图片链接已复制到剪贴板', classes: 'green' });
+        } catch (error) {
+          const textArea = document.createElement('textarea');
+          textArea.value = this.previewImage.url;
+          document.body.appendChild(textArea);
+          textArea.select();
+          try {
+            document.execCommand('copy');
+            M.toast({ html: '图片链接已复制到剪贴板', classes: 'green' });
+          } catch (fallbackError) {
+            M.toast({ html: '复制失败，请手动复制', classes: 'red' });
+          }
+          document.body.removeChild(textArea);
+        }
+      },
+
+      // 图片加载失败处理
+      handleImageError(event) {
+        event.target.style.display = 'none';
+        event.target.parentElement.innerHTML = `<i class="material-icons large" style="color: #999;">broken_image</i>`;
+      },
+
+      // 键盘事件处理
+      handleKeydown(event) {
+        if (event.key === 'Escape' && this.previewImage) {
+          this.closePreview();
+        }
       },
       
       // 获取图标样式
@@ -954,3 +1088,237 @@ import { API_ENDPOINTS, IMAGE_DOMAIN } from '../config/api.js';
     }
   }
   </script>
+
+  <style scoped>
+  /* ========== 缩略图网格视图 ========== */
+  .thumbnail-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    padding: 10px 0;
+  }
+
+  .thumbnail-item {
+    position: relative;
+    width: calc(25% - 12px);
+    min-width: 180px;
+  }
+
+  @media (max-width: 1200px) {
+    .thumbnail-item {
+      width: calc(33.333% - 10px);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .thumbnail-item {
+      width: calc(50% - 8px);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .thumbnail-item {
+      width: 100%;
+    }
+  }
+
+  .thumbnail-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    border: 1px solid #e8e8e8;
+  }
+
+  .thumbnail-card:hover {
+    box-shadow: 0 6px 20px rgba(25, 118, 210, 0.2);
+    border-color: #1976D2;
+    transform: translateY(-2px);
+  }
+
+  .thumbnail-image-container {
+    position: relative;
+    width: 100%;
+    height: 160px;
+    overflow: hidden;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .thumbnail-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+
+  .thumbnail-card:hover .thumbnail-image {
+    transform: scale(1.05);
+  }
+
+  .thumbnail-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .thumbnail-overlay i {
+    color: white;
+    font-size: 36px;
+  }
+
+  .thumbnail-card:hover .thumbnail-overlay {
+    opacity: 1;
+  }
+
+  .thumbnail-icon-container {
+    width: 100%;
+    height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+  }
+
+  .folder-icon-bg {
+    background: #E3F2FD;
+  }
+
+  .thumbnail-icon-container i.large {
+    font-size: 64px;
+  }
+
+  .thumbnail-name {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    background: #fafafa;
+    border-top: 1px solid #eee;
+  }
+
+  .folder-card .thumbnail-name {
+    font-weight: 500;
+    color: #1976D2;
+  }
+
+  .thumbnail-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .thumbnail-item:hover .thumbnail-actions {
+    opacity: 1;
+  }
+
+  .thumbnail-actions .btn-small {
+    width: 30px;
+    height: 30px;
+  }
+
+  .thumbnail-actions .btn-small i {
+    font-size: 16px;
+    line-height: 30px;
+  }
+
+  /* ========== 图片预览 Lightbox ========== */
+  .image-lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: none;
+  }
+
+  .lightbox-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+  }
+
+  .lightbox-container {
+    position: relative;
+    z-index: 1;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lightbox-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .lightbox-title {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin-right: 15px;
+  }
+
+  .lightbox-header-actions {
+    display: flex;
+    align-items: center;
+  }
+
+  .lightbox-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    min-height: 200px;
+  }
+
+  .lightbox-image {
+    max-width: 85vw;
+    max-height: 75vh;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+
+  .lightbox-footer {
+    padding: 8px 15px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 0 0 8px 8px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    text-align: center;
+  }
+  </style>
