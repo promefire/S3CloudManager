@@ -18,7 +18,9 @@
 
     <!-- 主内容区域 -->
     <main class="app-main">
-      <router-view/>
+      <keep-alive include="Buckets">
+        <router-view/>
+      </keep-alive>
     </main>
 
     <!-- 全局通知容器 -->

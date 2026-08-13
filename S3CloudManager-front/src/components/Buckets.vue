@@ -100,6 +100,10 @@ export default {
     M.Modal.init(document.querySelectorAll('.modal'));
     document.addEventListener('click', this.closeMenu);
   },
+  activated() {
+    // 从缓存恢复时刷新域名数据
+    this.loadBucketDomains();
+  },
   beforeUnmount() {
     document.removeEventListener('click', this.closeMenu);
   },
