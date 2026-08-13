@@ -20,30 +20,42 @@
     <main class="app-main">
       <router-view/>
     </main>
+
+    <!-- 全局通知容器 -->
+    <NotificationContainer ref="notificationContainer" />
   </div>
 </template>
 
 <script>
-/* global M */
 import SettingsModal from './components/SettingsModal.vue'
+import NotificationContainer from './components/NotificationContainer.vue'
 
 export default {
   name: 'App',
   components: {
-    SettingsModal
+    SettingsModal,
+    NotificationContainer
+  },
+  provide() {
+    return {
+      notify: this.notify
+    };
   },
   methods: {
     openSettings() {
       this.$refs.settingsModal.openModal()
     },
+    notify(message, type, duration) {
+      this.$refs.notificationContainer.show(message, type, duration);
+    },
     onConfigSaved() {
-      M.toast({ html: 'S3 配置已保存，正在刷新...', classes: 'green' })
+      this.notify('S3 配置已保存，正在刷新...', 'success')
       setTimeout(() => {
         window.location.reload()
       }, 1000)
     },
     onConfigCleared() {
-      M.toast({ html: '配置已清除，正在刷新...', classes: 'green' })
+      this.notify('配置已清除，正在刷新...', 'success')
       setTimeout(() => {
         window.location.reload()
       }, 1000)

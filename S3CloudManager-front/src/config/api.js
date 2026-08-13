@@ -84,8 +84,23 @@ export const API_ENDPOINTS = {
   }
 };
 
-// 图片域名配置
-export const IMAGE_DOMAIN = process.env.VUE_APP_IMAGE_DOMAIN || 'https://img.promefire.top';
+// 默认图片域名配置
+const DEFAULT_IMAGE_DOMAIN = process.env.VUE_APP_IMAGE_DOMAIN || 'https://img.promefire.top';
+
+import { getBucketDomain } from './storage.js';
+
+/**
+ * 获取指定存储桶的图片域名（优先使用自定义域）
+ * @param {string} bucketName - 存储桶名称
+ * @returns {string}
+ */
+export function getImageDomain(bucketName) {
+  if (bucketName) {
+    const customDomain = getBucketDomain(bucketName);
+    if (customDomain) return `https://${customDomain}`;
+  }
+  return DEFAULT_IMAGE_DOMAIN;
+}
 
 // 缩略图裁剪参数（Cloudflare Image Resizing）
 // 缩略图容器高度 160px，宽度自适应，2x 密度下 400px 足够清晰

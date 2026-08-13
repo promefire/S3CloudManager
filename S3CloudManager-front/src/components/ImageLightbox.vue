@@ -53,7 +53,7 @@ export default {
   emits: ['close', 'prev', 'next', 'show-copy-menu'],
   data() {
     return {
-      imageDomain: 'https://img.promefire.top'
+      imageDomain: ''
     }
   },
   methods: {
@@ -70,7 +70,10 @@ export default {
       }
     },
     getCopyMenuData() {
-      const objectKey = this.previewImage.url.replace(this.imageDomain + '/', '');
+      // 从 previewImage.url 中提取域名部分（协议+主机名）
+      const urlObj = new URL(this.previewImage.url);
+      const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+      const objectKey = this.previewImage.url.replace(baseUrl + '/', '');
       return { objectKey, filename: this.previewImage.name };
     }
   }

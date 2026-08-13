@@ -29,8 +29,7 @@
 </template>
 
 <script>
-/* global M */
-import { IMAGE_DOMAIN, THUMBNAIL_PARAMS } from '../config/api.js';
+import { getImageDomain, THUMBNAIL_PARAMS } from '../config/api.js';
 
 export default {
   name: 'CopyFormatMenu',
@@ -76,7 +75,7 @@ export default {
       const text = this.getCopyText(objectKey, filename, format);
       try {
         await navigator.clipboard.writeText(text);
-        M.toast({ html: '已复制到剪贴板', classes: 'green' });
+        this.$root.notify('已复制到剪贴板', 'success');
       } catch (error) {
         const textArea = document.createElement('textarea');
         textArea.value = text;
@@ -84,9 +83,9 @@ export default {
         textArea.select();
         try {
           document.execCommand('copy');
-          M.toast({ html: '已复制到剪贴板', classes: 'green' });
+          this.$root.notify('已复制到剪贴板', 'success');
         } catch (fallbackError) {
-          M.toast({ html: '复制失败，请手动复制', classes: 'red' });
+          this.$root.notify('复制失败，请手动复制', 'error');
         }
         document.body.removeChild(textArea);
       }
@@ -94,11 +93,13 @@ export default {
     },
 
     getImageRealUrl(filename) {
-      return `${IMAGE_DOMAIN}/${filename}`;
+      const bucketName = this.copyMenu.bucketName || '';
+      return `${getImageDomain(bucketName)}/${filename}`;
     },
 
     getImageThumbnailUrl(filename) {
-      return `${IMAGE_DOMAIN}/${filename}?${THUMBNAIL_PARAMS}`;
+      const bucketName = this.copyMenu.bucketName || '';
+      return `${getImageDomain(bucketName)}/${filename}?${THUMBNAIL_PARAMS}`;
     }
   }
 }

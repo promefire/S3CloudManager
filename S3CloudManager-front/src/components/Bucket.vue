@@ -4,17 +4,16 @@
       <div class="page-toolbar">
         <div class="toolbar-container">
           <div class="toolbar-left">
-            <router-link to="/" class="page-title-link">
+            <a href="#" class="page-title-link" @click.prevent="navigateUp">
               <i class="material-icons">arrow_back</i>
               <span class="page-title">{{ bucketName }}</span>
-            </router-link>
-            <div class="toolbar-breadcrumbs">
-              <a href="#" class="breadcrumb-link" @click="navigateTo('')">{{ bucketName }}</a>
+            </a>
+            <div class="toolbar-breadcrumbs" v-if="breadcrumbs.length > 1">
               <a v-for="crumb in breadcrumbs.slice(1)" :key="crumb.path" href="#" class="breadcrumb-link" @click="navigateTo(crumb.path)">{{ crumb.name }}</a>
             </div>
           </div>
-          <div class="toolbar-right" v-if="!objects.length">
-            <button @click="deleteBucket" class="btn btn-danger waves-effect waves-light">
+          <div class="toolbar-right">
+            <button v-if="!objects.length" @click="deleteBucket" class="btn btn-danger waves-effect waves-light">
               <i class="material-icons left">delete</i>删除
             </button>
           </div>
@@ -208,7 +207,7 @@
 
   <script>
   /* global M */
-import { API_ENDPOINTS, IMAGE_DOMAIN, THUMBNAIL_PARAMS, getHeaders } from '../config/api.js';
+import { API_ENDPOINTS, getImageDomain, THUMBNAIL_PARAMS, getHeaders } from '../config/api.js';
 import { isImageFile, formatFileSize } from '../utils/file-utils.js';
 import UploadPanel from './UploadPanel.vue';
 import ImageLightbox from './ImageLightbox.vue';
@@ -249,10 +248,12 @@ export default {
       },
       loadedImages: {},
       imageObserver: null,
-      currentImageIndex: 0
+      currentImageIndex: 0,
+      currentDomain: ''
     }
   },
   mounted() {
+    this.currentDomain = getImageDomain(this.bucketName);
     this.fetchObjects();
     M.Modal.init(document.querySelectorAll('.modal'));
     document.addEventListener('keydown', this.handleKeydown);
@@ -338,7 +339,7 @@ export default {
           // 根据 API 响应，使用 name 字段而不是 Key
           // 检查是否为文件夹：以 / 结尾，或者 type 为 folder，或者包含 //
           const isFolder = object.name.endsWith('/') || object.type === 'folder' || object.name.includes('//');
-          const displayName = isFolder ? object.name.replace(/\/$/, '') : object.name.split('/').pop();
+          const displayName = isFolder ? object.name.replace(/\/$/, '').split('/').pop() : object.name.split('/').pop();
 
           // 根据文件扩展名或类型设置图标
           let icon = 'insert_drive_file'; // 默认文件图标
@@ -438,11 +439,14 @@ export default {
           }
         });
 
+        // 更新当前存储桶的自定义域名
+        this.currentDomain = getImageDomain(this.bucketName);
+
         // 数据更新后设置懒加载观察
         this.setupLazyImages();
       } catch (error) {
         console.error('Error fetching objects:', error);
-        M.toast({ html: 'Failed to load objects', classes: 'red' });
+        this.$root.notify('Failed to load objects', 'error');
       }
     },
     async deleteBucket() {
@@ -460,11 +464,11 @@ export default {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        M.toast({ html: 'Bucket deleted successfully!', classes: 'green' });
+        this.$root.notify('Bucket deleted successfully!', 'success');
         this.$router.push('/');
       } catch (error) {
         console.error('Error deleting bucket:', error);
-        M.toast({ html: 'Failed to delete bucket', classes: 'red' });
+        this.$root.notify('Failed to delete bucket', 'error');
       }
     },
     navigateTo(key) {
@@ -506,6 +510,25 @@ export default {
       console.log('Will use browse API:', this.currentPath !== '');
       this.fetchObjects();
     },
+    navigateUp() {
+      // 如果在根目录，返回存储桶列表
+      if (!this.currentPath || this.currentPath === '') {
+        this.$router.push('/');
+        return;
+      }
+      // 去掉末尾 /
+      let path = this.currentPath.replace(/\/$/, '');
+      // 找到最后一个 / 的位置
+      const lastSlashIndex = path.lastIndexOf('/');
+      if (lastSlashIndex <= 0) {
+        // 没有更多层级，回到根目录
+        this.currentPath = '';
+      } else {
+        // 回到上一级
+        this.currentPath = path.substring(0, lastSlashIndex + 1);
+      }
+      this.fetchObjects();
+    },
     async deleteObject(key) {
       if (!confirm('Are you sure you want to delete this object?')) {
         return;
@@ -521,11 +544,11 @@ export default {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        M.toast({ html: 'Object deleted successfully!', classes: 'green' });
+        this.$root.notify('Object deleted successfully!', 'success');
         this.fetchObjects();
       } catch (error) {
         console.error('Error deleting object:', error);
-        M.toast({ html: 'Failed to delete object', classes: 'red' });
+        this.$root.notify('Failed to delete object', 'error');
       }
     },
     getDownloadUrl(objectKey) {
@@ -543,12 +566,12 @@ export default {
 
     // 获取图片的真实URL
     getImageRealUrl(filename) {
-      return `${IMAGE_DOMAIN}/${filename}`;
+      return `${this.currentDomain}/${filename}`;
     },
 
     // 获取缩略图URL（带CDN裁剪参数）
     getThumbnailUrl(filename) {
-      return `${IMAGE_DOMAIN}/${filename}?${THUMBNAIL_PARAMS}`;
+      return `${this.currentDomain}/${filename}?${THUMBNAIL_PARAMS}`;
     },
 
     // 处理对象点击事件
@@ -638,7 +661,8 @@ export default {
       this.copyMenu = {
         visible: true,
         objectKey,
-        filename
+        filename,
+        bucketName: this.bucketName
       };
     },
 
@@ -674,8 +698,10 @@ export default {
               // 加载失败：同样移除占位符，显示错误图标
               img.onerror = () => {
                 img.classList.add('loaded');
-                const placeholder = img.parentElement.querySelector('.lazy-placeholder');
-                if (placeholder) placeholder.remove();
+                if (img.parentElement) {
+                  const placeholder = img.parentElement.querySelector('.lazy-placeholder');
+                  if (placeholder) placeholder.remove();
+                }
                 this.handleImageError({ target: img });
               };
               img.src = src;
@@ -701,8 +727,11 @@ export default {
 
     // 图片加载失败处理
     handleImageError(event) {
-      event.target.style.display = 'none';
-      event.target.parentElement.innerHTML = `<i class="material-icons large" style="color: #999;">broken_image</i>`;
+      const img = event.target;
+      img.style.display = 'none';
+      if (img.parentElement) {
+        img.parentElement.innerHTML = `<i class="material-icons large" style="color: #999;">broken_image</i>`;
+      }
     },
 
     // 键盘事件处理
@@ -762,7 +791,7 @@ export default {
 
     async createFolder(folderName) {
       if (!folderName || !folderName.trim()) {
-        M.toast({ html: 'Please enter a folder name', classes: 'red' });
+        this.$root.notify('Please enter a folder name', 'error');
         return;
       }
 
@@ -780,14 +809,14 @@ export default {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        M.toast({ html: 'Folder created successfully!', classes: 'green' });
+        this.$root.notify('Folder created successfully!', 'success');
         this.newFolderName = '';
         const modal = M.Modal.getInstance(document.getElementById('modal-create-folder'));
         modal.close();
         this.fetchObjects();
       } catch (error) {
         console.error('Error creating folder:', error);
-        M.toast({ html: 'Failed to create folder', classes: 'red' });
+        this.$root.notify('Failed to create folder', 'error');
       }
     },
 
@@ -796,7 +825,7 @@ export default {
       try {
         const imageUrl = this.getImageRealUrl(objectKey);
         await navigator.clipboard.writeText(imageUrl);
-        M.toast({ html: '图片链接已复制到剪贴板', classes: 'green' });
+        this.$root.notify('图片链接已复制到剪贴板', 'success');
       } catch (error) {
         console.error('复制失败:', error);
         // 降级方案：使用传统方法复制
@@ -806,10 +835,10 @@ export default {
         textArea.select();
         try {
           document.execCommand('copy');
-          M.toast({ html: '图片链接已复制到剪贴板', classes: 'green' });
+          this.$root.notify('图片链接已复制到剪贴板', 'success');
         } catch (fallbackError) {
           console.error('降级复制也失败:', fallbackError);
-          M.toast({ html: '复制失败，请手动复制', classes: 'red' });
+          this.$root.notify('复制失败，请手动复制', 'error');
         }
         document.body.removeChild(textArea);
       }
@@ -836,18 +865,18 @@ export default {
         }
 
         await response.json();
-        M.toast({ html: '文件删除成功！', classes: 'green' });
+        this.$root.notify('文件删除成功！', 'success');
         this.fetchObjects();
       } catch (error) {
         console.error('Error deleting object:', error);
-        M.toast({ html: '删除文件失败', classes: 'red' });
+        this.$root.notify('删除文件失败', 'error');
       }
     },
 
     // 批量删除功能
     async batchDeleteObjects() {
       if (!this.selectedObjects.length) {
-        M.toast({ html: 'Please select objects to delete', classes: 'red' });
+        this.$root.notify('Please select objects to delete', 'error');
         return;
       }
 
@@ -870,12 +899,12 @@ export default {
         }
 
         const result = await response.json();
-        M.toast({ html: `Deleted ${result.delete_count || result.success_count} objects successfully!`, classes: 'green' });
+        this.$root.notify(`Deleted ${result.delete_count || result.success_count} objects successfully!`, 'success');
         this.selectedObjects = [];
         this.fetchObjects();
       } catch (error) {
         console.error('Error deleting objects:', error);
-        M.toast({ html: 'Failed to delete objects', classes: 'red' });
+        this.$root.notify('Failed to delete objects', 'error');
       }
     },
 

@@ -132,7 +132,6 @@
 </template>
 
 <script>
-/* global M */
 import { saveConfig, loadConfig, clearConfig, hasConfig, DEFAULT_CONFIG } from '../config/storage.js';
 
 export default {
@@ -169,16 +168,16 @@ export default {
     },
     saveSettings() {
       if (!this.form.endpoint || !this.form.accessKeyId || !this.form.secretAccessKey) {
-        M.toast({ html: '请填写所有必填项', classes: 'red' });
+        this.$root.notify('请填写所有必填项', 'error');
         return;
       }
       const success = saveConfig(this.form);
       if (success) {
-        M.toast({ html: '配置已保存（加密存储）', classes: 'green' });
+        this.$root.notify('配置已保存（加密存储）', 'success');
         this.hasConfig = true;
         this.$emit('config-saved', this.form);
       } else {
-        M.toast({ html: '保存失败', classes: 'red' });
+        this.$root.notify('保存失败', 'error');
       }
     },
     clearSettings() {
@@ -186,13 +185,13 @@ export default {
         clearConfig();
         this.hasConfig = false;
         this.form = { ...DEFAULT_CONFIG };
-        M.toast({ html: '配置已清除', classes: 'green' });
+        this.$root.notify('配置已清除', 'success');
         this.$emit('config-cleared');
       }
     },
     async testConnection() {
       if (!this.form.endpoint || !this.form.accessKeyId || !this.form.secretAccessKey) {
-        M.toast({ html: '请先填写连接信息', classes: 'red' });
+        this.$root.notify('请先填写连接信息', 'error');
         return;
       }
       this.isTesting = true;
@@ -205,13 +204,13 @@ export default {
           }
         });
         if (response.ok) {
-          M.toast({ html: '连接测试成功！', classes: 'green' });
+          this.$root.notify('连接测试成功！', 'success');
         } else {
           const data = await response.json();
-          M.toast({ html: '连接失败: ' + (data.error || '未知错误'), classes: 'red' });
+          this.$root.notify('连接失败: ' + (data.error || '未知错误'), 'error');
         }
       } catch (error) {
-        M.toast({ html: '连接失败: ' + error.message, classes: 'red' });
+        this.$root.notify('连接失败: ' + error.message, 'error');
       } finally {
         this.isTesting = false;
       }

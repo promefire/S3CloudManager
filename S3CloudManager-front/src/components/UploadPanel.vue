@@ -99,7 +99,6 @@
 </template>
 
 <script>
-/* global M */
 import { API_ENDPOINTS, getHeaders } from '../config/api.js';
 import { isImageFile, formatFileSize } from '../utils/file-utils.js';
 
@@ -189,14 +188,14 @@ export default {
         console.log('拖拽文件:', files);
         // 将拖拽的文件添加到现有文件列表中
         this.uploadFiles = [...this.uploadFiles, ...files];
-        M.toast({ html: `已添加 ${files.length} 个文件`, classes: 'green' });
+        this.$root.notify(`已添加 ${files.length} 个文件`, 'success');
       }
     },
 
     // 文件上传功能
     async uploadSelectedFiles() {
       if (!this.uploadFiles.length) {
-        M.toast({ html: 'Please select files to upload', classes: 'red' });
+        this.$root.notify('Please select files to upload', 'error');
         return;
       }
 
@@ -207,7 +206,7 @@ export default {
         let filesToUpload = this.uploadFiles;
         let convertedCount = 0;
         if (this.convertToWebp) {
-          M.toast({ html: '正在转换图片格式...', classes: 'blue' });
+          this.$root.notify('正在转换图片格式...', 'info');
           const results = await Promise.all(
             this.uploadFiles.map(async (file) => {
               if (isImageFile(file.name)) {
@@ -269,12 +268,12 @@ export default {
           parts.push(`已使用时间重命名 ${filesToUpload.length} 个文件`);
         }
         const msg = parts.length > 0 ? `上传成功！${parts.join('，')}` : 'Files uploaded successfully!';
-        M.toast({ html: msg, classes: 'green' });
+        this.$root.notify(msg, 'success');
         this.uploadFiles = [];
         this.$emit('upload-success');
       } catch (error) {
         console.error('Error uploading files:', error);
-        M.toast({ html: 'Failed to upload files', classes: 'red' });
+        this.$root.notify('Failed to upload files', 'error');
       } finally {
         this.isUploading = false;
       }
