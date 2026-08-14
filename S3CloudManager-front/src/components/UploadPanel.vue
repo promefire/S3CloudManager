@@ -25,17 +25,30 @@
           <i class="material-icons left">folder_open</i>选择文件
           <input type="file" multiple @change="handleFileSelect" accept="*/*" style="display: none;">
         </label>
+        <p class="upload-divider">或</p>
+        <button @click="triggerClipboardPaste" class="btn btn-secondary waves-effect waves-light upload-btn">
+          <i class="material-icons left">content_paste</i>从剪贴板粘贴
+        </button>
         <p class="upload-hint">支持多文件上传，单个文件最大 100MB</p>
+        <p class="upload-hint clipboard-hint">
+          <i class="material-icons">keyboard</i>
+          也可使用 <kbd>Ctrl</kbd>+<kbd>V</kbd> 快速粘贴剪贴板图片
+        </p>
       </div>
 
       <!-- 已选文件列表 -->
       <div v-if="uploadFiles.length" class="upload-content">
         <div class="upload-files-header">
           <span class="upload-files-count">已选择 {{ uploadFiles.length }} 个文件</span>
-          <label class="btn-flat btn-small waves-effect waves-light upload-add-more">
-            <i class="material-icons left" style="font-size: 16px;">add</i>添加更多
-            <input type="file" multiple @change="handleFileSelect" accept="*/*" style="display: none;">
-          </label>
+          <div class="upload-files-header-actions">
+            <button @click="triggerClipboardPaste" class="btn-flat btn-small waves-effect waves-light upload-add-more">
+              <i class="material-icons left" style="font-size: 16px;">content_paste</i>粘贴图片
+            </button>
+            <label class="btn-flat btn-small waves-effect waves-light upload-add-more">
+              <i class="material-icons left" style="font-size: 16px;">add</i>添加更多
+              <input type="file" multiple @change="handleFileSelect" accept="*/*" style="display: none;">
+            </label>
+          </div>
         </div>
         <div class="upload-files-list">
           <div v-for="(file, index) in uploadFiles" :key="index" class="upload-file-item">
@@ -128,7 +141,73 @@ export default {
       renameByTime: false
     }
   },
+  watch: {
+    showUploadPanel(val) {
+      if (val) {
+        document.addEventListener('paste', this.handlePaste)
+      } else {
+        document.removeEventListener('paste', this.handlePaste)
+      }
+    }
+  },
+  beforeUnmount() {
+    document.removeEventListener('paste', this.handlePaste)
+  },
   methods: {
+    // 点击按钮触发剪贴板粘贴
+    async triggerClipboardPaste() {
+      // 尝试使用 Clipboard API 读取图片
+      try {
+        if (navigator.clipboard && navigator.clipboard.read) {
+          const items = await navigator.clipboard.read()
+          const imageFiles = []
+          for (const item of items) {
+            const imageType = item.types.find(t => t.startsWith('image/'))
+            if (imageType) {
+              const blob = await item.getType(imageType)
+              const ext = imageType.split('/')[1] || 'png'
+              const fileName = `clipboard_${Date.now()}.${ext}`
+              imageFiles.push(new File([blob], fileName, { type: imageType }))
+            }
+          }
+          if (imageFiles.length > 0) {
+            this.uploadFiles = [...this.uploadFiles, ...imageFiles]
+            this.$root.notify(`已从剪贴板添加 ${imageFiles.length} 张图片`, 'success')
+            return
+          }
+        }
+      } catch (e) {
+        // Clipboard API 不可用或被拒绝，降级提示
+      }
+      // 降级：提示用户按 Ctrl+V
+      this.$root.notify('请使用 Ctrl+V 粘贴剪贴板图片', 'info')
+    },
+
+    // 处理粘贴事件（剪贴板图片上传）
+    handlePaste(event) {
+      const items = event.clipboardData?.items
+      if (!items) return
+
+      const imageFiles = []
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile()
+          if (file) {
+            // 为剪贴板图片生成文件名
+            const ext = item.type.split('/')[1] || 'png'
+            const fileName = `clipboard_${Date.now()}.${ext}`
+            const namedFile = new File([file], fileName, { type: item.type })
+            imageFiles.push(namedFile)
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        event.preventDefault()
+        this.uploadFiles = [...this.uploadFiles, ...imageFiles]
+        this.$root.notify(`已从剪贴板添加 ${imageFiles.length} 张图片`, 'success')
+      }
+    },
     // 处理文件选择
     handleFileSelect(event) {
       console.log('handleFileSelect called');
@@ -492,6 +571,30 @@ export default {
   margin: 16px 0 0;
 }
 
+.clipboard-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px !important;
+}
+
+.clipboard-hint i {
+  font-size: 16px;
+}
+
+.clipboard-hint kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--color-text);
+  background: #f1f5f9;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
 .upload-dropzone .upload-btn {
   cursor: pointer;
   padding: 0 20px;
@@ -519,6 +622,12 @@ export default {
   top: 0;
   background: var(--color-surface);
   z-index: 1;
+}
+
+.upload-files-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .upload-files-count {
