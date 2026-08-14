@@ -62,8 +62,15 @@
             </div>
             <!-- 文件信息 -->
             <div class="file-info">
-              <span class="file-name" :title="file.name">{{ file.name }}</span>
+              <input
+                v-model="fileNames[index]"
+                class="file-name-input"
+                :placeholder="file.name"
+                @click="$event.target.select()" />
               <span class="file-size">{{ formatFileSize(file.size) }}</span>
+              <span v-if="fileNames[index]" class="file-renamed-hint">
+                原文件名：{{ file.name }}
+              </span>
             </div>
             <!-- 删除按钮 -->
             <button @click="removeFile(index)" class="btn-floating btn-small btn-remove" title="移除">
@@ -92,9 +99,9 @@
         </div>
         <label class="convert-webp-label" style="margin-top: 8px;">
           <input type="checkbox" v-model="renameByTime" class="convert-webp-checkbox" />
-          <span class="convert-webp-text">使用时间重命名文件</span>
+          <span class="convert-webp-text">未手动命名的文件使用时间重命名</span>
         </label>
-        <p v-if="renameByTime" class="rename-hint">格式：年月日_时分秒_随机字符.扩展名</p>
+        <p v-if="renameByTime" class="rename-hint">格式：年月日_时分秒_随机字符.扩展名（已手动命名的文件不受影响）</p>
       </div>
 
       <!-- 操作按钮 -->
@@ -134,6 +141,7 @@ export default {
   data() {
     return {
       uploadFiles: [],
+      fileNames: {},       // { index: 自定义文件名 }，用于手动重命名
       isUploading: false,
       isDragOver: false,
       convertToWebp: false,
@@ -224,28 +232,34 @@ export default {
     },
     // 处理文件选择
     handleFileSelect(event) {
-      console.log('handleFileSelect called');
-      console.log('Files selected:', event.target.files);
       this.uploadFiles = Array.from(event.target.files);
-      console.log('uploadFiles array:', this.uploadFiles);
-      console.log('uploadFiles length:', this.uploadFiles.length);
-      // 强制更新视图
+      this.fileNames = {};
       this.$forceUpdate();
     },
 
     // 移除单个文件
     removeFile(index) {
       this.uploadFiles.splice(index, 1);
+      // 重新索引 fileNames
+      const newNames = {}
+      for (const key in this.fileNames) {
+        const k = parseInt(key)
+        if (k < index) newNames[k] = this.fileNames[key]
+        else if (k > index) newNames[k - 1] = this.fileNames[key]
+      }
+      this.fileNames = newNames
     },
 
     // 清空所有选择的文件
     clearUploadFiles() {
       this.uploadFiles = [];
+      this.fileNames = {};
     },
 
     // 关闭上传面板
     closeUploadPanel() {
       this.uploadFiles = [];
+      this.fileNames = {};
       this.isDragOver = false;
       this.$emit('close');
     },
@@ -278,9 +292,8 @@ export default {
 
       const files = Array.from(event.dataTransfer.files);
       if (files.length > 0) {
-        console.log('拖拽文件:', files);
-        // 将拖拽的文件添加到现有文件列表中
         this.uploadFiles = [...this.uploadFiles, ...files];
+        this.fileNames = {};
         this.$root.notify(`已添加 ${files.length} 个文件`, 'success');
       }
     },
@@ -318,16 +331,28 @@ export default {
           filesToUpload = results;
         }
 
-        // 如果开启了时间重命名，生成新文件名
-        if (this.renameByTime) {
-          filesToUpload = filesToUpload.map((file) => {
-            const newName = this.getTimestampFileName(file);
+        // 手动重命名 + 自动重命名（互斥优先级：手动 > 自动）
+        filesToUpload = filesToUpload.map((file, index) => {
+          const manualName = this.fileNames[index]?.trim()
+          if (manualName) {
+            // 手动重命名优先
+            const ext = file.name.split('.').pop()
+            const newName = manualName.includes('.') ? manualName : `${manualName}.${ext}`
             return new File([file], newName, {
               type: file.type,
               lastModified: file.lastModified,
-            });
-          });
-        }
+            })
+          }
+          // 开启了自动重命名且没有手动命名
+          if (this.renameByTime) {
+            const newName = this.getTimestampFileName(file)
+            return new File([file], newName, {
+              type: file.type,
+              lastModified: file.lastModified,
+            })
+          }
+          return file
+        })
 
         const uploadPromises = filesToUpload.map(async (file) => {
           const formData = new FormData();
@@ -357,12 +382,20 @@ export default {
         if (this.convertToWebp && convertedCount > 0) {
           parts.push(`转换 ${convertedCount} 个图片为 WebP`);
         }
+        const manualCount = Object.keys(this.fileNames).filter(k => this.fileNames[k]?.trim()).length;
+        if (manualCount > 0) {
+          parts.push(`手动重命名 ${manualCount} 个文件`);
+        }
         if (this.renameByTime) {
-          parts.push(`已使用时间重命名 ${filesToUpload.length} 个文件`);
+          const autoCount = filesToUpload.length - manualCount;
+          if (autoCount > 0) {
+            parts.push(`自动重命名 ${autoCount} 个文件`);
+          }
         }
         const msg = parts.length > 0 ? `上传成功！${parts.join('，')}` : '上传成功！';
         this.$root.notify(msg, 'success');
         this.uploadFiles = [];
+        this.fileNames = {};
         this.$emit('upload-success');
         this.closeUploadPanel();
       } catch (error) {
@@ -720,17 +753,44 @@ export default {
   gap: 2px;
 }
 
-.file-name {
+.file-name-input {
   font-size: var(--font-size-sm);
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  width: 100%;
+  background: transparent;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.file-name-input:hover {
+  border-color: var(--color-border);
+  background: #f8fafc;
+}
+
+.file-name-input:focus {
+  border-color: var(--color-primary);
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.file-name-input::placeholder {
+  color: var(--color-text-secondary);
 }
 
 .file-size {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
+  padding-left: 6px;
+}
+
+.file-renamed-hint {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  padding-left: 6px;
+  font-style: italic;
 }
 
 .btn-remove {
