@@ -154,33 +154,47 @@ export default {
     document.removeEventListener('paste', this.handlePaste)
   },
   methods: {
-    // 点击按钮触发剪贴板粘贴
+    // 点击按钮触发剪贴板粘贴（模拟 Ctrl+V）
     async triggerClipboardPaste() {
-      // 尝试使用 Clipboard API 读取图片
+      const fakeEvent = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: new DataTransfer()
+      })
+
+      // 尝试从 Clipboard API 获取图片并设置到 clipboardData
       try {
         if (navigator.clipboard && navigator.clipboard.read) {
           const items = await navigator.clipboard.read()
-          const imageFiles = []
           for (const item of items) {
             const imageType = item.types.find(t => t.startsWith('image/'))
             if (imageType) {
               const blob = await item.getType(imageType)
               const ext = imageType.split('/')[1] || 'png'
               const fileName = `clipboard_${Date.now()}.${ext}`
-              imageFiles.push(new File([blob], fileName, { type: imageType }))
+              const file = new File([blob], fileName, { type: imageType })
+              fakeEvent.clipboardData.items.add(file)
             }
-          }
-          if (imageFiles.length > 0) {
-            this.uploadFiles = [...this.uploadFiles, ...imageFiles]
-            this.$root.notify(`已从剪贴板添加 ${imageFiles.length} 张图片`, 'success')
-            return
           }
         }
       } catch (e) {
-        // Clipboard API 不可用或被拒绝，降级提示
+        // Clipboard API 不可用，降级使用 execCommand 触发粘贴
+        const pasteTarget = document.createElement('textarea')
+        pasteTarget.style.position = 'fixed'
+        pasteTarget.style.opacity = '0'
+        document.body.appendChild(pasteTarget)
+        pasteTarget.focus()
+        document.execCommand('paste')
+        document.body.removeChild(pasteTarget)
+        return
       }
-      // 降级：提示用户按 Ctrl+V
-      this.$root.notify('请使用 Ctrl+V 粘贴剪贴板图片', 'info')
+
+      // 如果有图片数据，触发 handlePaste
+      if (fakeEvent.clipboardData.items.length > 0) {
+        this.handlePaste(fakeEvent)
+      } else {
+        this.$root.notify('剪贴板中没有图片', 'info')
+      }
     },
 
     // 处理粘贴事件（剪贴板图片上传）
@@ -346,10 +360,11 @@ export default {
         if (this.renameByTime) {
           parts.push(`已使用时间重命名 ${filesToUpload.length} 个文件`);
         }
-        const msg = parts.length > 0 ? `上传成功！${parts.join('，')}` : 'Files uploaded successfully!';
+        const msg = parts.length > 0 ? `上传成功！${parts.join('，')}` : '上传成功！';
         this.$root.notify(msg, 'success');
         this.uploadFiles = [];
         this.$emit('upload-success');
+        this.closeUploadPanel();
       } catch (error) {
         console.error('Error uploading files:', error);
         this.$root.notify('Failed to upload files', 'error');
